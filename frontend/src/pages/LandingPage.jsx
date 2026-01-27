@@ -5,7 +5,6 @@ import {
   Features,
   HowItWorks,
   TargetUsers,
-  TechStack,
   CTA,
   Footer,
 } from '../components/landing';
