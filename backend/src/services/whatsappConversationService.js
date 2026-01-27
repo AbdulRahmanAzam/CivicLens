@@ -36,16 +36,21 @@ What issue would you like to report?`,
   },
 
   askLocation: {
-    en: `📍 Got it! Now please share your location.
+    en: `📍 Got it! Now I need your location.
 
-Tap the attachment (+) icon → Location → Share your current location
+Tap the button below to share your location instantly, or type your address/area name.`,
+    hi: `📍 समझ गया! अब मुझे आपका स्थान चाहिए।
 
-Or type your address/area name.`,
-    hi: `📍 समझ गया! अब कृपया अपना स्थान साझा करें।
+अपना स्थान तुरंत साझा करने के लिए नीचे दिए गए बटन पर टैप करें, या अपना पता/क्षेत्र का नाम टाइप करें।`,
+  },
 
-अटैचमेंट (+) आइकन पर टैप करें → Location → अपना वर्तमान स्थान साझा करें
+  askLocationSimple: {
+    en: `📍 Please share your location by tapping the button below 👇
 
-या अपना पता/क्षेत्र का नाम टाइप करें।`,
+Or type your address if you prefer.`,
+    hi: `📍 कृपया नीचे दिए गए बटन पर टैप करके अपना स्थान साझा करें 👇
+
+या यदि आप चाहें तो अपना पता टाइप करें।`,
   },
 
   askImage: {
@@ -146,6 +151,8 @@ Send a message to report an issue!`,
 class WhatsAppConversationService {
   constructor() {
     this.defaultLanguage = 'en';
+    // Enable web link for location sharing (set to false to disable)
+    this.enableLocationWebLink = process.env.ENABLE_LOCATION_WEB_LINK === 'true' || false;
   }
 
   /**
@@ -327,7 +334,57 @@ class WhatsAppConversationService {
     // Save description and move to location
     await sessionService.setDescription(phone, description, voiceMetadata);
     await sessionService.updateStep(phone, 'location');
-    await this.sendMessage(phone, this.getMessage('askLocation'));
+    
+    // Send location request with button for easy sharing
+    await this.sendLocationWithButton(phone);
+  }
+
+  /**
+   * Send location request with easy-tap button
+   */
+  async sendLocationWithButton(phone) {
+    try {
+      // Try to send location request button (easiest for users)
+      await whatsappService.sendLocationRequestButton(phone, this.getMessage('askLocationSimple'));
+    } catch (error) {
+      // Fallback to quick reply buttons
+      try {
+        await whatsappService.sendLocationQuickReply(phone, this.getMessage('askLocation'));
+      } catch (e) {
+        // Final fallback to plain text
+        await this.sendMessage(phone, this.getMessage('askLocation'));
+      }
+    }
+    
+    // Optionally send web link for location sharing
+    if (this.enableLocationWebLink) {
+      await this.sendLocationWebLink(phone);
+    }
+    
+    // Log the location request
+    await sessionService.addMessage(phone, 'outgoing', 'location_request', 'Location request sent');
+  }
+
+  /**
+   * Send web link for location sharing (as backup method)
+   */
+  async sendLocationWebLink(phone) {
+    try {
+      const session = await sessionService.getSession(phone);
+      if (!session) return;
+
+      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const locationUrl = `${baseUrl}/share-location?phone=${encodeURIComponent(phone)}&session=${session._id}`;
+
+      // Send link with clear instructions
+      await this.sendMessage(
+        phone,
+        `\n🔗 Or click this link to share location from your browser:\n${locationUrl}`
+      );
+    } catch (error) {
+      console.error('Error sending location web link:', error);
+      // Don't fail the whole flow if web link fails
+    }
   }
 
   /**
@@ -337,6 +394,23 @@ class WhatsAppConversationService {
     const { type, content } = messageData;
 
     let latitude, longitude, address;
+
+    // Handle button response for location sharing
+    if (type === 'button') {
+      const buttonId = content;
+      
+      if (buttonId === 'location_gps' || buttonId === 'share_location') {
+        // User clicked share location button - send reminder
+        await this.sendMessage(phone, 
+          '📍 Great! Now tap the attachment (+) icon at the bottom → Location → Send Your Current Location'
+        );
+        return;
+      } else if (buttonId === 'location_type' || buttonId === 'type_location') {
+        // User wants to type address
+        await this.sendMessage(phone, '✍️ Please type your address or area name:');
+        return;
+      }
+    }
 
     if (type === 'location') {
       latitude = content.latitude;

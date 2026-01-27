@@ -5,8 +5,10 @@ import {
   CitizenLogin, 
   CitizenRegister, 
   OfficialLogin, 
-  AdminLogin 
+  AdminLogin,
+  MapPage
 } from './pages'
+import ShareLocation from './pages/ShareLocation'
 
 function App() {
   return (
@@ -14,6 +16,12 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
+        
+        {/* Map View */}
+        <Route path="/map" element={<MapPage />} />
+        
+        {/* WhatsApp Location Sharing */}
+        <Route path="/share-location" element={<ShareLocation />} />
         
         {/* Citizen Auth Routes */}
         <Route path="/login" element={<CitizenLogin />} />

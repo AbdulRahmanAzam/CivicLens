@@ -5,6 +5,7 @@ const complaintRoutes = require('./complaintRoutes');
 const categoryRoutes = require('./categoryRoutes');
 const voiceRoutes = require('./voiceRoutes');
 const authRoutes = require('./authRoutes');
+const whatsappRoutes = require('./whatsappRoutes');
 
 /**
  * API Routes
@@ -32,6 +33,9 @@ router.use('/categories', categoryRoutes);
 
 // Voice routes
 router.use('/voice', voiceRoutes);
+
+// WhatsApp routes
+router.use('/whatsapp', whatsappRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
