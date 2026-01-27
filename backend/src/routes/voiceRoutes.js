@@ -15,6 +15,8 @@ const {
   getSupportedLanguages,
 } = require('../controllers/voiceController');
 
+const { optionalAuth } = require('../middlewares/authMiddleware');
+
 // Configure multer for audio uploads
 const audioStorage = multer.memoryStorage();
 
@@ -138,10 +140,11 @@ router.post(
 /**
  * @route   POST /api/v1/voice/complaint
  * @desc    Submit a voice complaint
- * @access  Public
+ * @access  Public (optionalAuth for tracking logged-in users)
  */
 router.post(
   '/complaint',
+  optionalAuth,
   uploadAudio.single('audio'),
   voiceComplaintValidation,
   handleValidation,

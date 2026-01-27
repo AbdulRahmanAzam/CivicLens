@@ -573,6 +573,149 @@ const response = await fetch('http://localhost:3000/api/v1/complaints/heatmap?da
 
 ---
 
+### GET `/complaints/heatmap/global`
+
+Get global heatmap data (all complaints with severity weighting) for red/orange/green gradient visualization.
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `category` | string | all | Filter by category |
+| `days` | number | 30 | Lookback period in days (1-365) |
+| `precision` | number | 3 | Decimal precision (3=~111m, 4=~11m clustering) |
+
+**Example:**
+```javascript
+const response = await fetch('http://localhost:3000/api/v1/complaints/heatmap/global?days=90&category=sanitation&precision=4');
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Global heatmap data retrieved successfully",
+  "data": {
+    "type": "global",
+    "filters": {
+      "category": "sanitation",
+      "days": 90,
+      "precision": 4
+    },
+    "clusters": [
+      {
+        "lat": 28.6139,
+        "lng": 77.2090,
+        "count": 15,
+        "avgSeverity": 7.3,
+        "maxSeverity": 9,
+        "primaryCategory": "sanitation",
+        "intensity": 10.95
+      },
+      {
+        "lat": 28.5245,
+        "lng": 77.1855,
+        "count": 8,
+        "avgSeverity": 5.1,
+        "maxSeverity": 7,
+        "primaryCategory": "roads",
+        "intensity": 4.08
+      }
+    ],
+    "count": 42,
+    "totalIntensity": 123.45
+  }
+}
+```
+
+**Data Fields Explained:**
+- `lat`, `lng`: Cluster center coordinates
+- `count`: Number of complaints in this cluster
+- `avgSeverity`: Average severity score (1-10)
+- `maxSeverity`: Highest severity in cluster
+- `intensity`: Weighted score = (count × avgSeverity / 10)
+- `primaryCategory`: Most common category in cluster
+
+---
+
+### GET `/complaints/heatmap/profile/:entityId`
+
+Get profile heatmap data (resolved complaints by specific organization/community) for yellow/red gradient impact visualization.
+
+**Path Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `entityId` | string | Yes | Organization/community ID (e.g., "MCD_SOUTH", "DELHI_POLICE") |
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 365 | Lookback period in days (default 1 year) |
+| `precision` | number | 3 | Decimal precision for clustering |
+
+**Example:**
+```javascript
+const response = await fetch('http://localhost:3000/api/v1/complaints/heatmap/profile/MCD_SOUTH?days=180');
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Profile heatmap data retrieved successfully",
+  "data": {
+    "type": "profile",
+    "entityId": "MCD_SOUTH",
+    "totalResolved": 127,
+    "filters": {
+      "days": 180,
+      "precision": 3
+    },
+    "clusters": [
+      {
+        "lat": 28.5245,
+        "lng": 77.1855,
+        "count": 23,
+        "avgResolutionTime": 4.2,
+        "primaryCategory": "roads",
+        "intensity": 4.6
+      },
+      {
+        "lat": 28.4817,
+        "lng": 77.0911,
+        "count": 18,
+        "avgResolutionTime": 6.5,
+        "primaryCategory": "water",
+        "intensity": 3.6
+      }
+    ],
+    "count": 18
+  }
+}
+```
+
+**Data Fields Explained:**
+- `entityId`: Organization/community that resolved complaints
+- `totalResolved`: Total complaints resolved by entity in time period
+- `lat`, `lng`: Cluster center coordinates
+- `count`: Number of resolved complaints in cluster
+- `avgResolutionTime`: Average resolution time in days
+- `intensity`: Impact score = (count / 5)
+- `primaryCategory`: Most common resolved category
+
+**Error Response (400):**
+```json
+{
+  "success": false,
+  "message": "Entity ID is required",
+  "error": "BAD_REQUEST"
+}
+```
+
+---
+
 ## Categories
 
 ### GET `/categories`

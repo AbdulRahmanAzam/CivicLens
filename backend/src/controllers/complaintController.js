@@ -202,6 +202,73 @@ const getHeatmap = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get global heatmap (all complaints, severity-weighted)
+ * @route   GET /api/v1/complaints/heatmap/global
+ * @access  Public
+ */
+const getGlobalHeatmap = asyncHandler(async (req, res) => {
+  const filters = {
+    category: req.query.category,
+    days: req.query.days ? parseInt(req.query.days, 10) : 30,
+    precision: req.query.precision ? parseInt(req.query.precision, 10) : 3,
+  };
+
+  const clusters = await complaintService.getGlobalHeatmap(filters);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Global heatmap data retrieved successfully',
+    data: {
+      type: 'global',
+      filters: {
+        category: filters.category || 'all',
+        days: filters.days,
+        precision: filters.precision,
+      },
+      clusters,
+      count: clusters.length,
+      totalIntensity: clusters.reduce((sum, c) => sum + c.intensity, 0),
+    },
+  });
+});
+
+/**
+ * @desc    Get profile heatmap (resolved complaints by entity)
+ * @route   GET /api/v1/complaints/heatmap/profile/:entityId
+ * @access  Public
+ */
+const getProfileHeatmap = asyncHandler(async (req, res) => {
+  const { entityId } = req.params;
+
+  if (!entityId) {
+    throw new AppError('Entity ID is required', HTTP_STATUS.BAD_REQUEST);
+  }
+
+  const filters = {
+    days: req.query.days ? parseInt(req.query.days, 10) : 365,
+    precision: req.query.precision ? parseInt(req.query.precision, 10) : 3,
+  };
+
+  const result = await complaintService.getProfileHeatmap(entityId, filters);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Profile heatmap data retrieved successfully',
+    data: {
+      type: 'profile',
+      entityId: result.entityId,
+      totalResolved: result.totalResolved,
+      filters: {
+        days: filters.days,
+        precision: filters.precision,
+      },
+      clusters: result.clusters,
+      count: result.clusters.length,
+    },
+  });
+});
+
+/**
  * @desc    Get AI classification statistics
  * @route   GET /api/v1/complaints/ai-stats
  * @access  Public
@@ -289,5 +356,7 @@ module.exports = {
   updateComplaintStatus,
   getStats,
   getHeatmap,
+  getGlobalHeatmap,
+  getProfileHeatmap,
   getAIStats,
 };

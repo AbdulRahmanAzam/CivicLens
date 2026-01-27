@@ -4,6 +4,7 @@ const router = express.Router();
 const complaintRoutes = require('./complaintRoutes');
 const categoryRoutes = require('./categoryRoutes');
 const voiceRoutes = require('./voiceRoutes');
+const authRoutes = require('./authRoutes');
 
 /**
  * API Routes
@@ -19,6 +20,9 @@ router.get('/health', (req, res) => {
     version: '1.0.0',
   });
 });
+
+// Auth routes (no prefix needed, already /auth)
+router.use('/auth', authRoutes);
 
 // Complaint routes
 router.use('/complaints', complaintRoutes);
@@ -37,6 +41,20 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     documentation: '/api/v1/docs',
     endpoints: {
+      auth: {
+        'POST /api/v1/auth/register': 'Register a new user',
+        'POST /api/v1/auth/login': 'Login user',
+        'POST /api/v1/auth/logout': 'Logout (requires auth)',
+        'POST /api/v1/auth/refresh-token': 'Refresh access token',
+        'GET /api/v1/auth/me': 'Get current user profile (requires auth)',
+        'PATCH /api/v1/auth/me': 'Update profile (requires auth)',
+        'PATCH /api/v1/auth/change-password': 'Change password (requires auth)',
+        'POST /api/v1/auth/forgot-password': 'Request password reset',
+        'POST /api/v1/auth/reset-password/:token': 'Reset password with token',
+        'GET /api/v1/auth/verify-email/:token': 'Verify email address',
+        'GET /api/v1/auth/users': 'Get all users (admin only)',
+        'POST /api/v1/auth/users': 'Create user (admin only)',
+      },
       complaints: {
         'GET /api/v1/complaints': 'Get all complaints with filters',
         'POST /api/v1/complaints': 'Submit a new complaint',
@@ -44,6 +62,8 @@ router.get('/', (req, res) => {
         'PATCH /api/v1/complaints/:id/status': 'Update complaint status',
         'GET /api/v1/complaints/stats': 'Get complaint statistics',
         'GET /api/v1/complaints/heatmap': 'Get heatmap data',
+        'GET /api/v1/complaints/heatmap/global': 'Get global heatmap',
+        'GET /api/v1/complaints/heatmap/profile/:entityId': 'Get profile heatmap',
       },
       categories: {
         'GET /api/v1/categories': 'Get all categories',

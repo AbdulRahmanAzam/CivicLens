@@ -384,6 +384,135 @@ class ComplaintService {
   }
 
   /**
+   * Get global heatmap data (all complaints with severity weighting)
+   * For red/orange/green gradient showing problem density
+   */
+  async getGlobalHeatmap(filters = {}) {
+    const { category, days = TIME.DEFAULT_REPORT_DAYS, precision = 3 } = filters;
+    const { start } = getDateRange(days);
+
+    const matchStage = {
+      createdAt: { $gte: start },
+    };
+
+    if (category) {
+      matchStage['category.primary'] = category;
+    }
+
+    // Aggregate complaints by location grid with severity weighting
+    const clusters = await Complaint.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            // Round to specified decimal places (3 = ~111m, 4 = ~11m)
+            lat: {
+              $round: [{ $arrayElemAt: ['$location.coordinates', 1] }, precision],
+            },
+            lng: {
+              $round: [{ $arrayElemAt: ['$location.coordinates', 0] }, precision],
+            },
+          },
+          count: { $sum: 1 },
+          avgSeverity: { $avg: '$severity.score' },
+          maxSeverity: { $max: '$severity.score' },
+          categories: { $push: '$category.primary' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          lat: '$_id.lat',
+          lng: '$_id.lng',
+          count: 1,
+          avgSeverity: { $round: ['$avgSeverity', 2] },
+          maxSeverity: 1,
+          primaryCategory: { $arrayElemAt: ['$categories', 0] },
+          // Intensity: normalized weighted score (count × avgSeverity / 10)
+          intensity: {
+            $divide: [
+              { $multiply: ['$count', '$avgSeverity'] },
+              10,
+            ],
+          },
+        },
+      },
+      { $sort: { intensity: -1 } },
+    ]);
+
+    return clusters;
+  }
+
+  /**
+   * Get profile heatmap data (resolved complaints by specific entity)
+   * For yellow/red gradient showing organizational/community impact
+   */
+  async getProfileHeatmap(entityId, filters = {}) {
+    if (!entityId) {
+      throw new Error('Entity ID is required for profile heatmap');
+    }
+
+    const { days = 365, precision = 3 } = filters; // Default to 1 year
+    const { start } = getDateRange(days);
+
+    const matchStage = {
+      'status.current': 'resolved',
+      'resolution.resolvedBy': entityId,
+      createdAt: { $gte: start },
+    };
+
+    // Aggregate resolved complaints by location
+    const clusters = await Complaint.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            lat: {
+              $round: [{ $arrayElemAt: ['$location.coordinates', 1] }, precision],
+            },
+            lng: {
+              $round: [{ $arrayElemAt: ['$location.coordinates', 0] }, precision],
+            },
+          },
+          count: { $sum: 1 },
+          avgResolutionTime: {
+            $avg: {
+              $divide: [
+                {
+                  $subtract: ['$resolution.resolvedAt', '$createdAt'],
+                },
+                1000 * 60 * 60 * 24, // Convert to days
+              ],
+            },
+          },
+          categories: { $push: '$category.primary' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          lat: '$_id.lat',
+          lng: '$_id.lng',
+          count: 1,
+          avgResolutionTime: { $round: ['$avgResolutionTime', 1] },
+          primaryCategory: { $arrayElemAt: ['$categories', 0] },
+          // Intensity: based on resolution count (higher = more impact)
+          intensity: {
+            $divide: ['$count', 5], // Normalize by dividing by 5
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    return {
+      entityId,
+      totalResolved: clusters.reduce((sum, c) => sum + c.count, 0),
+      clusters,
+    };
+  }
+
+  /**
    * Check for potential duplicate complaints
    * Uses the enhanced duplicate detection service
    */

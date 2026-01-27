@@ -15,6 +15,18 @@ const {
   validateUploadedFiles,
   handleUploadError,
 } = require('./uploadMiddleware');
+const {
+  protect,
+  optionalAuth,
+  authorize,
+  requireVerified,
+  authRateLimiter,
+  checkOwnership,
+  departmentAccess,
+  auditAuth,
+  minRole,
+  ROLE_HIERARCHY,
+} = require('./authMiddleware');
 
 module.exports = {
   // Error handling
@@ -38,4 +50,16 @@ module.exports = {
   uploadSingleImageMiddleware,
   validateUploadedFiles,
   handleUploadError,
+  
+  // Authentication & Authorization
+  protect,
+  optionalAuth,
+  authorize,
+  requireVerified,
+  authRateLimiter,
+  checkOwnership,
+  departmentAccess,
+  auditAuth,
+  minRole,
+  ROLE_HIERARCHY,
 };
