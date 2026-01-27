@@ -196,8 +196,9 @@ class WhatsAppConversationService {
       // Get or create session
       const session = await sessionService.getOrCreateSession(phone, { pushName });
 
-      // Log incoming message
-      await sessionService.addMessage(phone, 'incoming', type, 
+      // Log incoming message (sanitize type for unknown messages)
+      const messageType = ['text', 'audio', 'image', 'location', 'button', 'list'].includes(type) ? type : 'text';
+      await sessionService.addMessage(phone, 'incoming', messageType, 
         typeof content === 'string' ? content : JSON.stringify(content)
       );
 

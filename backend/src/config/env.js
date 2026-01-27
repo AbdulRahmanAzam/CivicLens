@@ -29,11 +29,16 @@ const env = {
   // Google Maps
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
   
-  // JWT (for future authentication)
+  // JWT
   jwt: {
     secret: process.env.JWT_SECRET || 'default-jwt-secret-change-in-production',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
+    refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   },
+  
+  // Frontend URL (for email links)
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
   
   // Helper methods
   isDevelopment: () => env.nodeEnv === 'development',

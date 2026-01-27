@@ -8,6 +8,8 @@ const {
   updateComplaintStatus,
   getStats,
   getHeatmap,
+  getGlobalHeatmap,
+  getProfileHeatmap,
   getAIStats,
 } = require('../controllers/complaintController');
 
@@ -23,6 +25,8 @@ const {
   uploadImagesMiddleware,
   validateUploadedFiles,
 } = require('../middlewares/uploadMiddleware');
+
+const { protect, authorize, optionalAuth } = require('../middlewares/authMiddleware');
 
 /**
  * @route   GET /api/v1/complaints/stats
@@ -44,6 +48,20 @@ router.get('/ai-stats', getAIStats);
  * @access  Public
  */
 router.get('/heatmap', statsValidation, getHeatmap);
+
+/**
+ * @route   GET /api/v1/complaints/heatmap/global
+ * @desc    Get global heatmap (all complaints, severity-weighted)
+ * @access  Public
+ */
+router.get('/heatmap/global', statsValidation, getGlobalHeatmap);
+
+/**
+ * @route   GET /api/v1/complaints/heatmap/profile/:entityId
+ * @desc    Get profile heatmap (resolved complaints by specific entity)
+ * @access  Public
+ */
+router.get('/heatmap/profile/:entityId', getProfileHeatmap);
 
 /**
  * @route   GET /api/v1/complaints
@@ -75,8 +93,14 @@ router.get('/:id', getComplaintByIdValidation, getComplaintById);
 /**
  * @route   PATCH /api/v1/complaints/:id/status
  * @desc    Update complaint status
- * @access  Public (should be protected in production)
+ * @access  Officer, Supervisor, Admin, Superadmin
  */
-router.patch('/:id/status', updateStatusValidation, updateComplaintStatus);
+router.patch(
+  '/:id/status',
+  protect,
+  authorize('officer', 'supervisor', 'admin', 'superadmin'),
+  updateStatusValidation,
+  updateComplaintStatus
+);
 
 module.exports = router;

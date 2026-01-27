@@ -56,7 +56,7 @@ const categorySchema = new mongoose.Schema({
 });
 
 // Index for faster lookups
-categorySchema.index({ name: 1 });
+// Note: name already has unique index from field definition
 categorySchema.index({ isActive: 1 });
 
 /**

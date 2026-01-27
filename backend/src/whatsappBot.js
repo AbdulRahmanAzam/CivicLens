@@ -13,7 +13,7 @@ const config = require('./config/env');
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    await mongoose.connect(config.mongodb.uri);
+    await mongoose.connect(config.mongoUri);
     console.log('✅ MongoDB connected');
     return true;
   } catch (error) {

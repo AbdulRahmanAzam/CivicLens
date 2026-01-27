@@ -8,6 +8,7 @@ const speechService = require('./speechService');
 const sessionService = require('./sessionService');
 const whatsappService = require('./whatsappService');
 const whatsappConversationService = require('./whatsappConversationService');
+const authService = require('./authService');
 
 module.exports = {
   complaintService,
@@ -20,4 +21,5 @@ module.exports = {
   sessionService,
   whatsappService,
   whatsappConversationService,
+  authService,
 };

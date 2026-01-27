@@ -9,6 +9,8 @@ const {
   getCategoryStats,
 } = require('../controllers/categoryController');
 
+const { protect, authorize } = require('../middlewares/authMiddleware');
+
 /**
  * @route   GET /api/v1/categories
  * @desc    Get all categories
@@ -26,9 +28,9 @@ router.get('/stats', getCategoryStats);
 /**
  * @route   POST /api/v1/categories/seed
  * @desc    Seed default categories (admin only)
- * @access  Admin
+ * @access  Admin, Superadmin
  */
-router.post('/seed', seedCategories);
+router.post('/seed', protect, authorize('admin', 'superadmin'), seedCategories);
 
 /**
  * @route   POST /api/v1/categories/classify

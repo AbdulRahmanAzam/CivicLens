@@ -266,6 +266,8 @@ complaintSchema.index({ 'severity.score': -1 });
 complaintSchema.index({ 'location.area': 1, 'category.primary': 1 });
 // Text index for search
 complaintSchema.index({ description: 'text', 'location.address': 'text' });
+// Index for heatmap profile queries (resolved complaints by entity)
+complaintSchema.index({ 'resolution.resolvedBy': 1, 'status.current': 1 });
 
 /**
  * Pre-save middleware to generate complaintId
