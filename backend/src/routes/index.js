@@ -5,6 +5,7 @@ const complaintRoutes = require('./complaintRoutes');
 const categoryRoutes = require('./categoryRoutes');
 const voiceRoutes = require('./voiceRoutes');
 const authRoutes = require('./authRoutes');
+const whatsappRoutes = require('./whatsappRoutes');
 const hierarchyRoutes = require('./hierarchy');
 const invitationRoutes = require('./invitation');
 const analyticsRoutes = require('./analytics');
@@ -36,6 +37,8 @@ router.use('/categories', categoryRoutes);
 // Voice routes
 router.use('/voice', voiceRoutes);
 
+// WhatsApp routes
+router.use('/whatsapp', whatsappRoutes);
 // Hierarchy routes (City → Town → UC management)
 router.use('/hierarchy', hierarchyRoutes);
 

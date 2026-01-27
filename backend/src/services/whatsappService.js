@@ -306,6 +306,80 @@ class WhatsAppService extends EventEmitter {
   }
 
   /**
+   * Send location request with button (Easy one-tap sharing)
+   */
+  async sendLocationRequestButton(phone, text) {
+    if (!this.isConnected) {
+      throw new Error('WhatsApp not connected');
+    }
+
+    const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+
+    // Send message with location request button
+    const message = {
+      text: text || '📍 Please share your current location',
+      requestLocationMessage: {
+        message: text || '📍 We need your location to process your complaint',
+      },
+    };
+
+    try {
+      await this.socket.sendMessage(jid, message);
+      return { success: true };
+    } catch (error) {
+      // Fallback to regular buttons if requestLocationMessage not supported
+      console.log('Location request button not supported, using regular buttons');
+      
+      const buttons = [
+        { id: 'share_location', text: '📍 Share My Location' },
+        { id: 'type_location', text: '✍️ Type Address' },
+      ];
+
+      await this.sendButtons(phone, text || '📍 Please share your location:', buttons);
+      return { success: true, fallback: true };
+    }
+  }
+
+  /**
+   * Send quick reply buttons for location sharing
+   */
+  async sendLocationQuickReply(phone, text) {
+    if (!this.isConnected) {
+      throw new Error('WhatsApp not connected');
+    }
+
+    const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+
+    // Send message with quick reply buttons
+    const message = {
+      text: text || '📍 How would you like to share your location?',
+      footer: 'CivicLens - Civic Complaint System',
+      buttons: [
+        {
+          buttonId: 'location_gps',
+          buttonText: { displayText: '📍 Share GPS Location' },
+          type: 1,
+        },
+        {
+          buttonId: 'location_type',
+          buttonText: { displayText: '✍️ Type Address' },
+          type: 1,
+        },
+      ],
+      headerType: 1,
+    };
+
+    try {
+      await this.socket.sendMessage(jid, message);
+      return { success: true };
+    } catch (error) {
+      console.log('Quick reply buttons not supported, using plain text');
+      await this.sendText(phone, text || '📍 Please share your location or type your address');
+      return { success: true, fallback: true };
+    }
+  }
+
+  /**
    * Send image
    */
   async sendImage(phone, imageBuffer, caption = '') {
