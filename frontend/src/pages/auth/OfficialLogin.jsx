@@ -57,7 +57,13 @@ const OfficialLogin = () => {
     console.log('Official login:', { type: selectedType, ...formData });
     setTimeout(() => {
       setIsLoading(false);
-      // navigate('/admin/dashboard');
+      if (selectedType === 'mayor') {
+        navigate('/mayor/dashboard');
+      } else if (selectedType === 'township') {
+        navigate('/township/dashboard');
+      } else if (selectedType === 'uc_chairman') {
+        navigate('/uc/dashboard');
+      }
     }, 1500);
   };
 

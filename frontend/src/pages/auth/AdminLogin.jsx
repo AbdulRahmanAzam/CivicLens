@@ -22,7 +22,7 @@ const AdminLogin = () => {
     console.log('Admin login:', formData);
     setTimeout(() => {
       setIsLoading(false);
-      // navigate('/admin/dashboard');
+      navigate('/admin/dashboard');
     }, 1500);
   };
 
