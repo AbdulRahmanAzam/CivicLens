@@ -1,29 +1,61 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthLayout, InputField } from '../../components/auth';
+import { useAuth } from '../../contexts';
 
 const CitizenLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, error: authError, clearError } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Get the redirect path from location state, or default to citizen dashboard
+  const from = location.state?.from?.pathname || '/citizen/dashboard';
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+    if (authError) clearError();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Implement actual login logic
-    console.log('Citizen login:', formData);
-    setTimeout(() => {
+    setError('');
+
+    try {
+      const response = await login(formData);
+      
+      // Redirect based on user role
+      const dashboardPath = getDashboardPath(response.user?.role);
+      navigate(dashboardPath, { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
       setIsLoading(false);
-      navigate('/citizen/dashboard');
-    }, 1500);
+    }
+  };
+
+  const getDashboardPath = (role) => {
+    switch (role) {
+      case 'admin':
+        return '/admin/dashboard';
+      case 'mayor':
+        return '/mayor/dashboard';
+      case 'township_officer':
+        return '/township/dashboard';
+      case 'uc_chairman':
+        return '/uc/dashboard';
+      case 'citizen':
+      default:
+        return '/citizen/dashboard';
+    }
   };
 
   return (
@@ -32,6 +64,12 @@ const CitizenLogin = () => {
       subtitle="Sign in to your citizen account"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
+        {(error || authError) && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+            {error || authError}
+          </div>
+        )}
+
         <InputField
           label="Email Address"
           type="email"

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout, InputField } from '../../components/auth';
+import { useAuth } from '../../contexts';
 
 const officialTypes = [
   {
     id: 'mayor',
     title: 'Mayor',
     description: 'City-level administrator',
+    role: 'mayor',
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -17,6 +19,7 @@ const officialTypes = [
     id: 'township',
     title: 'Township Head',
     description: 'Township-level administrator',
+    role: 'township_officer',
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -27,6 +30,7 @@ const officialTypes = [
     id: 'uc_chairman',
     title: 'UC Chairman',
     description: 'Union Council administrator',
+    role: 'uc_chairman',
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -37,34 +41,61 @@ const officialTypes = [
 
 const OfficialLogin = () => {
   const navigate = useNavigate();
+  const { login, error: authError, clearError } = useAuth();
   const [selectedType, setSelectedType] = useState(null);
   const [formData, setFormData] = useState({
     employeeId: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+    if (authError) clearError();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedType) return;
+    if (!selectedType) {
+      setError('Please select your role');
+      return;
+    }
     
     setIsLoading(true);
-    // TODO: Implement actual login logic
-    console.log('Official login:', { type: selectedType, ...formData });
-    setTimeout(() => {
+    setError('');
+
+    try {
+      // Use employeeId as email for login
+      const response = await login({
+        email: formData.employeeId,
+        password: formData.password,
+      });
+
+      // Redirect based on user role from response
+      const dashboardPath = getDashboardPath(response.user?.role);
+      navigate(dashboardPath, { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
       setIsLoading(false);
-      if (selectedType === 'mayor') {
-        navigate('/mayor/dashboard');
-      } else if (selectedType === 'township') {
-        navigate('/township/dashboard');
-      } else if (selectedType === 'uc_chairman') {
-        navigate('/uc/dashboard');
-      }
-    }, 1500);
+    }
+  };
+
+  const getDashboardPath = (role) => {
+    switch (role) {
+      case 'admin':
+        return '/admin/dashboard';
+      case 'mayor':
+        return '/mayor/dashboard';
+      case 'township_officer':
+        return '/township/dashboard';
+      case 'uc_chairman':
+        return '/uc/dashboard';
+      default:
+        return '/citizen/dashboard';
+    }
   };
 
   return (
@@ -72,6 +103,13 @@ const OfficialLogin = () => {
       title="Official Login" 
       subtitle="Access the administrative dashboard"
     >
+      {/* Error Message */}
+      {(error || authError) && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">
+          {error || authError}
+        </div>
+      )}
+
       {/* Official Type Selection */}
       <div className="space-y-3 mb-6">
         <label className="block text-sm font-medium text-foreground mb-2">

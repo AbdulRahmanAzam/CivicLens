@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout, InputField } from '../../components/auth';
+import { useAuth } from '../../contexts';
 
 const CitizenRegister = () => {
   const navigate = useNavigate();
+  const { register, error: authError, clearError } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -17,6 +19,7 @@ const CitizenRegister = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,6 +27,8 @@ const CitizenRegister = () => {
     if (errors[e.target.name]) {
       setErrors({ ...errors, [e.target.name]: '' });
     }
+    setApiError('');
+    if (authError) clearError();
   };
 
   const validateStep1 = () => {
@@ -59,12 +64,30 @@ const CitizenRegister = () => {
     if (!validateStep2()) return;
 
     setIsLoading(true);
-    // TODO: Implement actual registration logic
-    console.log('Citizen register:', formData);
-    setTimeout(() => {
+    setApiError('');
+
+    try {
+      // Prepare registration data
+      const userData = {
+        name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        cnic: formData.cnic,
+        address: formData.address,
+        city: formData.city,
+        password: formData.password,
+        role: 'citizen', // Default role for citizen registration
+      };
+
+      await register(userData);
+      
+      // Registration successful, redirect to dashboard
+      navigate('/citizen/dashboard', { replace: true });
+    } catch (err) {
+      setApiError(err.response?.data?.message || 'Registration failed. Please try again.');
+    } finally {
       setIsLoading(false);
-      // navigate('/login');
-    }, 1500);
+    }
   };
 
   return (
@@ -84,6 +107,12 @@ const CitizenRegister = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {(apiError || authError) && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+            {apiError || authError}
+          </div>
+        )}
+
         {step === 1 ? (
           <>
             <InputField

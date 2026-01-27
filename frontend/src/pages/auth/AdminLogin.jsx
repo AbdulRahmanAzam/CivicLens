@@ -1,29 +1,50 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout, InputField } from '../../components/auth';
+import { useAuth } from '../../contexts';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { login, error: authError, clearError } = useAuth();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
     securityKey: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+    if (authError) clearError();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Implement actual admin login logic
-    console.log('Admin login:', formData);
-    setTimeout(() => {
+    setError('');
+
+    try {
+      // Use username as email and include security key in request
+      const response = await login({
+        email: formData.username,
+        password: formData.password,
+        securityKey: formData.securityKey, // Backend should validate this for admin logins
+      });
+
+      // Verify user is admin
+      if (response.user?.role !== 'admin') {
+        setError('Access denied. Admin privileges required.');
+        return;
+      }
+
+      navigate('/admin/dashboard', { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Authentication failed. Please check your credentials.');
+    } finally {
       setIsLoading(false);
-      navigate('/admin/dashboard');
-    }, 1500);
+    }
   };
 
   return (
@@ -45,6 +66,13 @@ const AdminLogin = () => {
           </div>
         </div>
       </div>
+
+      {/* Error Message */}
+      {(error || authError) && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">
+          {error || authError}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <InputField
