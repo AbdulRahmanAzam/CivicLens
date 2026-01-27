@@ -176,6 +176,9 @@ npm test
 
 # Run tests with coverage
 npm run test:coverage
+
+# Run API smoke tests (writes JSON report to /reports)
+npm run test:apis
 ```
 
 ## Error Handling

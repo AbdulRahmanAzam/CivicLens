@@ -30,7 +30,7 @@ router.get('/stats', getCategoryStats);
  * @desc    Seed default categories (admin only)
  * @access  Admin, Superadmin
  */
-router.post('/seed', protect, authorize('admin', 'superadmin'), seedCategories);
+router.post('/seed', protect, authorize('website_admin'), seedCategories);
 
 /**
  * @route   POST /api/v1/categories/classify

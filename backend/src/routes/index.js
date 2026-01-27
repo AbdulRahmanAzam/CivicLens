@@ -5,6 +5,9 @@ const complaintRoutes = require('./complaintRoutes');
 const categoryRoutes = require('./categoryRoutes');
 const voiceRoutes = require('./voiceRoutes');
 const authRoutes = require('./authRoutes');
+const hierarchyRoutes = require('./hierarchy');
+const invitationRoutes = require('./invitation');
+const analyticsRoutes = require('./analytics');
 
 /**
  * API Routes
@@ -32,6 +35,15 @@ router.use('/categories', categoryRoutes);
 
 // Voice routes
 router.use('/voice', voiceRoutes);
+
+// Hierarchy routes (City → Town → UC management)
+router.use('/hierarchy', hierarchyRoutes);
+
+// Invitation routes (Admin role invitations)
+router.use('/invitations', invitationRoutes);
+
+// Analytics routes (hierarchy-based reporting)
+router.use('/analytics', analyticsRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
@@ -77,6 +89,37 @@ router.get('/', (req, res) => {
         'POST /api/v1/voice/transcribe': 'Transcribe audio only',
         'GET /api/v1/voice/status': 'Get speech service status',
         'GET /api/v1/voice/languages': 'Get supported languages',
+      },
+      hierarchy: {
+        'GET /api/v1/hierarchy/tree': 'Get full City → Town → UC tree',
+        'POST /api/v1/hierarchy/find-uc': 'Find UC by location',
+        'POST /api/v1/hierarchy/nearby-ucs': 'Get nearby UCs for selection',
+        'GET /api/v1/hierarchy/stats': 'Get hierarchy statistics (admin)',
+        'GET /api/v1/hierarchy/cities': 'Get all cities',
+        'POST /api/v1/hierarchy/cities': 'Create city (website_admin)',
+        'GET /api/v1/hierarchy/cities/:cityId': 'Get city details',
+        'GET /api/v1/hierarchy/cities/:cityId/towns': 'Get towns in city',
+        'POST /api/v1/hierarchy/cities/:cityId/towns': 'Create town',
+        'GET /api/v1/hierarchy/towns/:townId': 'Get town details',
+        'GET /api/v1/hierarchy/towns/:townId/ucs': 'Get UCs in town',
+        'POST /api/v1/hierarchy/towns/:townId/ucs': 'Create UC',
+        'GET /api/v1/hierarchy/ucs/:ucId': 'Get UC details',
+      },
+      invitations: {
+        'POST /api/v1/invitations': 'Create invitation (admin roles)',
+        'GET /api/v1/invitations': 'Get pending invitations',
+        'GET /api/v1/invitations/validate/:token': 'Validate invitation token',
+        'POST /api/v1/invitations/accept': 'Accept invitation & register',
+        'DELETE /api/v1/invitations/:id': 'Revoke invitation',
+        'POST /api/v1/invitations/:id/resend': 'Resend invitation',
+        'GET /api/v1/invitations/stats': 'Get invitation stats (admin)',
+      },
+      analytics: {
+        'GET /api/v1/analytics/system': 'System-wide analytics (website_admin)',
+        'GET /api/v1/analytics/city/:cityId': 'City analytics (mayor+)',
+        'GET /api/v1/analytics/town/:townId': 'Town analytics (town_chairman+)',
+        'GET /api/v1/analytics/uc/:ucId': 'UC analytics (uc_chairman+)',
+        'GET /api/v1/analytics/sla-performance': 'SLA performance report',
       },
     },
   });

@@ -5,6 +5,7 @@
 
 const User = require('../models/User');
 const authService = require('../services/authService');
+const emailService = require('../services/emailService');
 const { asyncHandler, AppError } = require('../middlewares/errorHandler');
 const { HTTP_STATUS } = require('../utils/constants');
 
@@ -16,14 +17,18 @@ const { HTTP_STATUS } = require('../utils/constants');
 const register = asyncHandler(async (req, res) => {
   const { name, email, phone, password, confirmPassword } = req.body;
   
+  console.log('🔵 Registration attempt:', { email, name, phone });
+  
   // Check if passwords match
   if (password !== confirmPassword) {
+    console.log('❌ Password mismatch for:', email);
     throw new AppError('Passwords do not match', HTTP_STATUS.BAD_REQUEST);
   }
   
   // Check if user already exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
+    console.log('❌ User already exists:', email);
     throw new AppError('Email already registered', HTTP_STATUS.CONFLICT);
   }
   
@@ -36,12 +41,37 @@ const register = asyncHandler(async (req, res) => {
     role: 'citizen', // Default role
   });
   
+  console.log('✅ User created successfully:', { id: user._id, email: user.email });
+  
   // Generate tokens
   const tokens = await authService.generateTokenPair(user);
   
   // Generate verification token (for email verification)
-  // In production, send this via email
   const { verifyToken } = await authService.generateVerificationToken(user._id);
+  
+  // Send verification email
+  try {
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verifyToken}`;
+    
+    await emailService.sendEmail({
+      to: user.email,
+      subject: 'CivicLens - Verify Your Email Address',
+      html: `
+        <h2>Welcome to CivicLens, ${user.name}!</h2>
+        <p>Thank you for registering. Please click the link below to verify your email address:</p>
+        <a href="${verificationUrl}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+          Verify Email
+        </a>
+        <p>If you didn't register for this account, please ignore this email.</p>
+        <p>This link will expire in 24 hours.</p>
+      `
+    });
+    
+    console.log('✅ Verification email sent to:', user.email);
+  } catch (emailError) {
+    console.log('⚠️ Failed to send verification email:', emailError.message);
+    // Don't fail registration if email fails, just log the error
+  }
   
   res.status(HTTP_STATUS.CREATED).json({
     success: true,
@@ -63,6 +93,8 @@ const register = asyncHandler(async (req, res) => {
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   
+  console.log('🔵 Login attempt:', email);
+  
   // Validate input
   if (!email || !password) {
     throw new AppError('Please provide email and password', HTTP_STATUS.BAD_REQUEST);
@@ -72,8 +104,11 @@ const login = asyncHandler(async (req, res) => {
   const user = await User.findByCredentials(email, password);
   
   if (!user) {
+    console.log('❌ Invalid login credentials for:', email);
     throw new AppError('Invalid email or password', HTTP_STATUS.UNAUTHORIZED);
   }
+  
+  console.log('✅ Login successful:', { id: user._id, email: user.email, role: user.role });
   
   // Generate tokens
   const tokens = await authService.generateTokenPair(user);
@@ -240,11 +275,42 @@ const changePassword = asyncHandler(async (req, res) => {
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   
+  console.log('🔵 Password reset request for:', email);
+  
   if (!email) {
     throw new AppError('Please provide your email', HTTP_STATUS.BAD_REQUEST);
   }
   
   const result = await authService.generatePasswordResetToken(email);
+  
+  // Send password reset email if user exists
+  if (result && result.resetToken) {
+    try {
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${result.resetToken}`;
+      
+      await emailService.sendEmail({
+        to: email,
+        subject: 'CivicLens - Password Reset Request',
+        html: `
+          <h2>Password Reset Request</h2>
+          <p>You requested to reset your password for your CivicLens account.</p>
+          <p>Click the link below to reset your password:</p>
+          <a href="${resetUrl}" style="background: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Reset Password
+          </a>
+          <p>If you didn't request this, please ignore this email.</p>
+          <p>This link will expire in 1 hour.</p>
+        `
+      });
+      
+      console.log('✅ Password reset email sent to:', email);
+    } catch (emailError) {
+      console.log('⚠️ Failed to send password reset email:', emailError.message);
+      // Don't fail the request if email fails, just log the error
+    }
+  } else {
+    console.log('⚠️ Password reset requested for non-existent email:', email);
+  }
   
   // Always return success to prevent email enumeration
   res.status(HTTP_STATUS.OK).json({
@@ -264,15 +330,20 @@ const resetPassword = asyncHandler(async (req, res) => {
   const { token } = req.params;
   const { password, confirmPassword } = req.body;
   
+  console.log('🔵 Password reset attempt with token:', token);
+  
   if (!password || !confirmPassword) {
     throw new AppError('Please provide password and confirmation', HTTP_STATUS.BAD_REQUEST);
   }
   
   if (password !== confirmPassword) {
+    console.log('❌ Password mismatch during reset');
     throw new AppError('Passwords do not match', HTTP_STATUS.BAD_REQUEST);
   }
   
   await authService.resetPasswordWithToken(token, password);
+  
+  console.log('✅ Password reset successful');
   
   res.status(HTTP_STATUS.OK).json({
     success: true,
