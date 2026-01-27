@@ -22,7 +22,7 @@ const CitizenLogin = () => {
     console.log('Citizen login:', formData);
     setTimeout(() => {
       setIsLoading(false);
-      // navigate('/dashboard');
+      navigate('/citizen/dashboard');
     }, 1500);
   };
 

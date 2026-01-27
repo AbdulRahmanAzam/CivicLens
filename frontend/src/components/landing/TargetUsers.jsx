@@ -61,7 +61,7 @@ const TargetUsers = () => {
           />
         </svg>
       ),
-      title: "Government Departments",
+      title: "Government Officials",
       description: "Urban management, utilities, and public works teams.",
       benefits: [
         "Real-time issue monitoring",
