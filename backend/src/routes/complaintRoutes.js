@@ -11,6 +11,9 @@ const {
   getGlobalHeatmap,
   getProfileHeatmap,
   getAIStats,
+  submitCitizenFeedback,
+  getSLABreaches,
+  getMyComplaints,
 } = require('../controllers/complaintController');
 
 const {
@@ -26,14 +29,19 @@ const {
   validateUploadedFiles,
 } = require('../middlewares/uploadMiddleware');
 
-const { protect, authorize, optionalAuth } = require('../middlewares/authMiddleware');
+const { 
+  protect, 
+  authorize, 
+  optionalAuth,
+  hierarchyAccess,
+} = require('../middlewares/authMiddleware');
 
 /**
  * @route   GET /api/v1/complaints/stats
  * @desc    Get complaint statistics
- * @access  Public
+ * @access  Public (optionally filtered by hierarchy)
  */
-router.get('/stats', statsValidation, getStats);
+router.get('/stats', optionalAuth, hierarchyAccess, statsValidation, getStats);
 
 /**
  * @route   GET /api/v1/complaints/ai-stats
@@ -41,6 +49,26 @@ router.get('/stats', statsValidation, getStats);
  * @access  Public
  */
 router.get('/ai-stats', getAIStats);
+
+/**
+ * @route   GET /api/v1/complaints/sla-breaches
+ * @desc    Get SLA breach summary
+ * @access  Protected - UC Chairman+
+ */
+router.get(
+  '/sla-breaches',
+  protect,
+  authorize('uc_chairman', 'town_chairman', 'mayor', 'website_admin'),
+  hierarchyAccess,
+  getSLABreaches
+);
+
+/**
+ * @route   GET /api/v1/complaints/my
+ * @desc    Get current user's complaints
+ * @access  Protected - Citizen
+ */
+router.get('/my', protect, getMyComplaints);
 
 /**
  * @route   GET /api/v1/complaints/heatmap
@@ -66,17 +94,18 @@ router.get('/heatmap/profile/:entityId', getProfileHeatmap);
 /**
  * @route   GET /api/v1/complaints
  * @desc    Get all complaints with filters and pagination
- * @access  Public
+ * @access  Public (optionally filtered by hierarchy for authenticated users)
  */
-router.get('/', getComplaintsValidation, getComplaints);
+router.get('/', optionalAuth, hierarchyAccess, getComplaintsValidation, getComplaints);
 
 /**
  * @route   POST /api/v1/complaints
  * @desc    Submit a new complaint
- * @access  Public
+ * @access  Public (optionalAuth for linking to user account)
  */
 router.post(
   '/',
+  optionalAuth,
   uploadImagesMiddleware,
   validateUploadedFiles,
   createComplaintValidation,
@@ -93,14 +122,26 @@ router.get('/:id', getComplaintByIdValidation, getComplaintById);
 /**
  * @route   PATCH /api/v1/complaints/:id/status
  * @desc    Update complaint status
- * @access  Officer, Supervisor, Admin, Superadmin
+ * @access  Protected - UC Chairman, Town Chairman, Mayor, Website Admin
  */
 router.patch(
   '/:id/status',
   protect,
-  authorize('officer', 'supervisor', 'admin', 'superadmin'),
+  authorize('uc_chairman', 'town_chairman', 'mayor', 'website_admin', 'citizen'),
   updateStatusValidation,
   updateComplaintStatus
+);
+
+/**
+ * @route   POST /api/v1/complaints/:id/feedback
+ * @desc    Submit citizen feedback for resolved complaint
+ * @access  Protected - Citizen (own complaints only)
+ */
+router.post(
+  '/:id/feedback',
+  protect,
+  authorize('citizen'),
+  submitCitizenFeedback
 );
 
 module.exports = router;

@@ -238,8 +238,9 @@ const authRateLimiter = (() => {
  */
 const checkOwnership = (resourceField = 'userId') => {
   return (req, res, next) => {
-    // Admins can access everything
-    if (['admin', 'superadmin'].includes(req.user.role)) {
+    // Admins can access everything (new and legacy roles)
+    const adminRoles = ['website_admin', 'admin', 'superadmin'];
+    if (adminRoles.includes(req.user.role)) {
       return next();
     }
     
@@ -265,10 +266,12 @@ const checkOwnership = (resourceField = 'userId') => {
 /**
  * Department-based access control
  * Restricts officers to their assigned department
+ * @deprecated Use hierarchyAccess instead for new code
  */
 const departmentAccess = (req, res, next) => {
   // Admins can access everything
-  if (['admin', 'superadmin'].includes(req.user.role)) {
+  const adminRoles = ['website_admin', 'admin', 'superadmin'];
+  if (adminRoles.includes(req.user.role)) {
     return next();
   }
   
@@ -288,6 +291,149 @@ const departmentAccess = (req, res, next) => {
   }
   
   next();
+};
+
+/**
+ * Hierarchy-based access control (UC → Town → City)
+ * Restricts chairmen and mayors to their assigned geographic areas
+ * 
+ * Usage:
+ *   router.get('/complaints', protect, hierarchyAccess, getComplaints);
+ * 
+ * This middleware sets req.hierarchyFilter based on user role:
+ *   - website_admin: no filter (sees all)
+ *   - mayor: cityId filter
+ *   - town_chairman: townId filter  
+ *   - uc_chairman: ucId filter
+ *   - citizen: userId filter (own complaints only)
+ */
+const hierarchyAccess = (req, res, next) => {
+  if (!req.user) {
+    return next(
+      new AppError(
+        'You are not logged in. Please login to access this resource.',
+        HTTP_STATUS.UNAUTHORIZED
+      )
+    );
+  }
+
+  // Website admins can access everything
+  if (req.user.role === 'website_admin') {
+    req.hierarchyFilter = {};
+    return next();
+  }
+
+  // Mayors see their city
+  if (req.user.role === 'mayor') {
+    if (!req.user.city) {
+      return next(
+        new AppError(
+          'No city assigned. Please contact administrator.',
+          HTTP_STATUS.FORBIDDEN
+        )
+      );
+    }
+    req.hierarchyFilter = { cityId: req.user.city };
+    return next();
+  }
+
+  // Town chairmen see their town
+  if (req.user.role === 'town_chairman') {
+    if (!req.user.town) {
+      return next(
+        new AppError(
+          'No town assigned. Please contact administrator.',
+          HTTP_STATUS.FORBIDDEN
+        )
+      );
+    }
+    req.hierarchyFilter = { townId: req.user.town };
+    return next();
+  }
+
+  // UC chairmen see their UC
+  if (req.user.role === 'uc_chairman') {
+    if (!req.user.uc) {
+      return next(
+        new AppError(
+          'No UC assigned. Please contact administrator.',
+          HTTP_STATUS.FORBIDDEN
+        )
+      );
+    }
+    req.hierarchyFilter = { ucId: req.user.uc };
+    return next();
+  }
+
+  // Citizens see only their own resources
+  if (req.user.role === 'citizen') {
+    req.hierarchyFilter = { citizenUser: req.user._id };
+    return next();
+  }
+
+  // Legacy roles fallback
+  if (['officer', 'supervisor', 'admin', 'superadmin'].includes(req.user.role)) {
+    req.hierarchyFilter = {};
+    return next();
+  }
+
+  // Unknown role - deny access
+  return next(
+    new AppError(
+      'Invalid role. Access denied.',
+      HTTP_STATUS.FORBIDDEN
+    )
+  );
+};
+
+/**
+ * Check if user can access a specific UC
+ */
+const canAccessUC = (ucId) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return next(
+        new AppError(
+          'You are not logged in.',
+          HTTP_STATUS.UNAUTHORIZED
+        )
+      );
+    }
+
+    // Website admins can access everything
+    if (req.user.role === 'website_admin') {
+      return next();
+    }
+
+    const UC = require('../models/UC');
+    const uc = await UC.findById(ucId);
+
+    if (!uc) {
+      return next(new AppError('UC not found', 404));
+    }
+
+    // Mayor can access UCs in their city
+    if (req.user.role === 'mayor' && uc.city.toString() === req.user.city?.toString()) {
+      return next();
+    }
+
+    // Town chairman can access UCs in their town
+    if (req.user.role === 'town_chairman' && uc.town.toString() === req.user.town?.toString()) {
+      return next();
+    }
+
+    // UC chairman can access their own UC
+    if (req.user.role === 'uc_chairman' && uc._id.toString() === req.user.uc?.toString()) {
+      return next();
+    }
+
+    return next(
+      new AppError(
+        'You do not have permission to access this UC.',
+        HTTP_STATUS.FORBIDDEN
+      )
+    );
+  };
 };
 
 /**
@@ -316,11 +462,17 @@ const auditAuth = (action) => {
 };
 
 // Role hierarchy for permission checks
+// New hierarchy: citizen < uc_chairman < town_chairman < mayor < website_admin
 const ROLE_HIERARCHY = {
   citizen: 0,
+  uc_chairman: 1,
+  town_chairman: 2,
+  mayor: 3,
+  website_admin: 4,
+  // Legacy roles (for backward compatibility during migration)
   officer: 1,
   supervisor: 2,
-  admin: 3,
+  admin: 4,
   superadmin: 4,
 };
 
@@ -363,6 +515,8 @@ module.exports = {
   authRateLimiter,
   checkOwnership,
   departmentAccess,
+  hierarchyAccess,
+  canAccessUC,
   auditAuth,
   minRole,
   ROLE_HIERARCHY,

@@ -1,16 +1,19 @@
 const { complaintService } = require('../services');
 const { asyncHandler, AppError } = require('../middlewares/errorHandler');
 const { SUCCESS_MESSAGES, HTTP_STATUS } = require('../utils/constants');
+const ucAssignmentService = require('../services/ucAssignmentService');
+const { AuditLog } = require('../models');
 
 /**
  * Complaint Controller
  * Handles HTTP requests for complaint operations
+ * Updated for UC → Town → City hierarchy
  */
 
 /**
  * @desc    Submit a new complaint
  * @route   POST /api/v1/complaints
- * @access  Public
+ * @access  Public (or authenticated citizen)
  */
 const createComplaint = asyncHandler(async (req, res) => {
   const {
@@ -22,23 +25,74 @@ const createComplaint = asyncHandler(async (req, res) => {
     longitude,
     address,
     source,
+    ucId, // Optional: manual UC selection
   } = req.body;
 
-  // Add request metadata
+  const lat = parseFloat(latitude);
+  const lng = parseFloat(longitude);
+
+  // Automatically assign UC based on location
+  let ucAssignment;
+  if (ucId) {
+    // Manual UC selection - validate it
+    ucAssignment = await ucAssignmentService.validateManualSelection(ucId, lng, lat);
+    if (!ucAssignment.valid) {
+      throw new AppError(ucAssignment.error, HTTP_STATUS.BAD_REQUEST);
+    }
+    ucAssignment.method = 'manual';
+    ucAssignment.confidence = 'manual';
+  } else {
+    // Auto-assign by location
+    ucAssignment = await ucAssignmentService.assignByLocation(lng, lat);
+    if (ucAssignment.error) {
+      throw new AppError(ucAssignment.error, HTTP_STATUS.BAD_REQUEST);
+    }
+  }
+
+  // Add request metadata and hierarchy info
   const data = {
     description,
     phone,
     name,
     email,
-    latitude: parseFloat(latitude),
-    longitude: parseFloat(longitude),
+    latitude: lat,
+    longitude: lng,
     address,
     source,
+    // Hierarchy assignment
+    ucId: ucAssignment.ucId,
+    townId: ucAssignment.townId,
+    cityId: ucAssignment.cityId,
+    ucAssignment: {
+      method: ucAssignment.method,
+      confidence: ucAssignment.confidence,
+      distance: ucAssignment.distance,
+    },
+    // If authenticated user, link to their account
+    citizenUser: req.user?._id,
     ipAddress: req.ip || req.connection.remoteAddress,
     userAgent: req.get('User-Agent'),
   };
 
   const result = await complaintService.createComplaint(data, req.files);
+
+  // Audit log for complaint creation
+  await AuditLog.logAction({
+    action: 'complaint_created',
+    actor: req.user?._id || null,
+    target: {
+      type: 'complaint',
+      id: result.complaint._id,
+    },
+    details: {
+      complaintId: result.complaint.complaintId,
+      category: result.complaint.category.primary,
+      ucId: ucAssignment.ucId?.toString(),
+      source,
+    },
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
+  });
 
   res.status(HTTP_STATUS.CREATED).json({
     success: true,
@@ -63,6 +117,18 @@ const createComplaint = asyncHandler(async (req, res) => {
         address: result.complaint.location.address,
         area: result.complaint.location.area,
       },
+      // Include hierarchy info in response
+      hierarchy: {
+        uc: ucAssignment.uc?.name,
+        town: ucAssignment.town?.name,
+        city: ucAssignment.city?.name,
+        assignmentMethod: ucAssignment.method,
+        confidence: ucAssignment.confidence,
+      },
+      sla: {
+        deadline: result.complaint.slaDeadline,
+        targetHours: result.complaint.slaHours,
+      },
       duplicateInfo: result.duplicateCheck.isDuplicate
         ? {
             isDuplicate: true,
@@ -81,7 +147,7 @@ const createComplaint = asyncHandler(async (req, res) => {
 /**
  * @desc    Get complaints with filters
  * @route   GET /api/v1/complaints
- * @access  Public
+ * @access  Protected (role-based filtering via hierarchyAccess middleware)
  */
 const getComplaints = asyncHandler(async (req, res) => {
   const filters = {
@@ -100,7 +166,18 @@ const getComplaints = asyncHandler(async (req, res) => {
     radius: req.query.radius ? parseInt(req.query.radius, 10) : undefined,
     sort_by: req.query.sort_by,
     sort_order: req.query.sort_order,
+    // New hierarchy filters
+    ucId: req.query.ucId,
+    townId: req.query.townId,
+    cityId: req.query.cityId,
+    slaBreach: req.query.slaBreach === 'true',
   };
+
+  // Apply hierarchy filter from middleware (if authenticated)
+  // This restricts results based on user's role and assigned area
+  if (req.hierarchyFilter) {
+    Object.assign(filters, req.hierarchyFilter);
+  }
 
   // Remove undefined values
   Object.keys(filters).forEach((key) => {
@@ -137,27 +214,115 @@ const getComplaintById = asyncHandler(async (req, res) => {
 /**
  * @desc    Update complaint status
  * @route   PATCH /api/v1/complaints/:id/status
- * @access  Public (should be protected in production)
+ * @access  Protected - UC Chairman, Town Chairman, Mayor, Website Admin
  */
 const updateComplaintStatus = asyncHandler(async (req, res) => {
-  const { status, remarks, updatedBy } = req.body;
+  const { status, remarks } = req.body;
+  const complaintId = req.params.id;
 
-  const complaint = await complaintService.updateStatus(req.params.id, {
+  // Get complaint first to check permissions
+  const complaint = await complaintService.getComplaintById(complaintId);
+  
+  // Verify user has access to this complaint's UC/Town/City
+  const user = req.user;
+  const canUpdate = await verifyComplaintAccess(user, complaint);
+  
+  if (!canUpdate) {
+    throw new AppError(
+      'You do not have permission to update this complaint',
+      HTTP_STATUS.FORBIDDEN
+    );
+  }
+
+  // Handle citizen feedback separately
+  if (status === 'citizen_feedback') {
+    // Only the original citizen can provide feedback
+    if (!user || user.role !== 'citizen' || 
+        user._id.toString() !== complaint.citizenUser?.toString()) {
+      throw new AppError(
+        'Only the original complainant can provide feedback',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
+    // Citizen feedback requires rating
+    if (!req.body.rating) {
+      throw new AppError(
+        'Rating is required for citizen feedback',
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+  }
+
+  const updatedComplaint = await complaintService.updateStatus(complaintId, {
     status,
     remarks,
-    updatedBy,
+    updatedBy: user._id,
+    rating: req.body.rating,
+    feedback: req.body.feedback,
+  });
+
+  // Audit log
+  await AuditLog.logAction({
+    action: 'complaint_status_updated',
+    actor: user._id,
+    target: {
+      type: 'complaint',
+      id: complaint._id,
+    },
+    details: {
+      complaintId: complaint.complaintId,
+      previousStatus: complaint.status.current,
+      newStatus: status,
+      remarks,
+    },
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
   });
 
   res.status(HTTP_STATUS.OK).json({
     success: true,
     message: SUCCESS_MESSAGES.STATUS_UPDATED,
     data: {
-      complaintId: complaint.complaintId,
-      currentStatus: complaint.status.current,
-      statusHistory: complaint.status.history,
+      complaintId: updatedComplaint.complaintId,
+      currentStatus: updatedComplaint.status.current,
+      statusHistory: updatedComplaint.status.history,
+      slaBreach: updatedComplaint.slaBreach,
     },
   });
 });
+
+/**
+ * Verify user has access to update a complaint
+ */
+const verifyComplaintAccess = async (user, complaint) => {
+  if (!user) return false;
+  
+  // Website admin has access to all
+  if (user.role === 'website_admin') return true;
+  
+  // Mayor has access to their city
+  if (user.role === 'mayor') {
+    return user.city?.toString() === complaint.cityId?.toString();
+  }
+  
+  // Town chairman has access to their town
+  if (user.role === 'town_chairman') {
+    return user.town?.toString() === complaint.townId?.toString();
+  }
+  
+  // UC chairman has access to their UC
+  if (user.role === 'uc_chairman') {
+    return user.uc?.toString() === complaint.ucId?.toString();
+  }
+  
+  // Citizens can only provide feedback on their own resolved complaints
+  if (user.role === 'citizen') {
+    return user._id.toString() === complaint.citizenUser?.toString();
+  }
+  
+  return false;
+};
 
 /**
  * @desc    Get complaint statistics
@@ -283,6 +448,154 @@ const getAIStats = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Submit citizen feedback for a resolved complaint
+ * @route   POST /api/v1/complaints/:id/feedback
+ * @access  Protected - Citizen (own complaints only)
+ */
+const submitCitizenFeedback = asyncHandler(async (req, res) => {
+  const { rating, comment, resolved } = req.body;
+  const complaintId = req.params.id;
+
+  // Validate rating
+  if (!rating || rating < 1 || rating > 5) {
+    throw new AppError('Rating must be between 1 and 5', HTTP_STATUS.BAD_REQUEST);
+  }
+
+  const complaint = await complaintService.getComplaintById(complaintId);
+
+  // Verify complaint belongs to this citizen
+  if (!req.user || req.user._id.toString() !== complaint.citizenUser?.toString()) {
+    throw new AppError(
+      'You can only provide feedback on your own complaints',
+      HTTP_STATUS.FORBIDDEN
+    );
+  }
+
+  // Verify complaint is in resolved status
+  if (complaint.status.current !== 'resolved') {
+    throw new AppError(
+      'Feedback can only be provided for resolved complaints',
+      HTTP_STATUS.BAD_REQUEST
+    );
+  }
+
+  // Update complaint with feedback
+  const updatedComplaint = await complaintService.updateStatus(complaintId, {
+    status: 'citizen_feedback',
+    rating,
+    feedback: comment,
+    citizenResolved: resolved !== false, // Default true if not specified
+    updatedBy: req.user._id,
+  });
+
+  // Audit log
+  await AuditLog.logAction({
+    action: 'citizen_feedback_submitted',
+    actor: req.user._id,
+    target: {
+      type: 'complaint',
+      id: complaint._id,
+    },
+    details: {
+      complaintId: complaint.complaintId,
+      rating,
+      citizenResolved: resolved !== false,
+    },
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent'),
+  });
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Thank you for your feedback!',
+    data: {
+      complaintId: updatedComplaint.complaintId,
+      status: updatedComplaint.status.current,
+      feedback: {
+        rating,
+        comment,
+        citizenResolved: resolved !== false,
+      },
+    },
+  });
+});
+
+/**
+ * @desc    Get SLA breach summary
+ * @route   GET /api/v1/complaints/sla-breaches
+ * @access  Protected - UC Chairman+
+ */
+const getSLABreaches = asyncHandler(async (req, res) => {
+  const filters = {
+    slaBreach: true,
+    status: { $nin: ['closed', 'citizen_feedback'] },
+    ...req.hierarchyFilter, // Apply role-based filtering
+  };
+
+  if (req.query.category) filters.category = req.query.category;
+  if (req.query.ucId) filters.ucId = req.query.ucId;
+  if (req.query.townId) filters.townId = req.query.townId;
+
+  const { Complaint } = require('../models');
+  
+  const breaches = await Complaint.find(filters)
+    .populate('ucId', 'name code')
+    .populate('townId', 'name code')
+    .populate('cityId', 'name code')
+    .sort({ slaDeadline: 1 })
+    .limit(100);
+
+  // Calculate overdue time for each
+  const now = new Date();
+  const formattedBreaches = breaches.map(complaint => ({
+    complaintId: complaint.complaintId,
+    category: complaint.category.primary,
+    status: complaint.status.current,
+    slaDeadline: complaint.slaDeadline,
+    overdueHours: Math.round((now - complaint.slaDeadline) / (1000 * 60 * 60)),
+    uc: complaint.ucId?.name,
+    town: complaint.townId?.name,
+    createdAt: complaint.createdAt,
+  }));
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: {
+      count: formattedBreaches.length,
+      breaches: formattedBreaches,
+    },
+  });
+});
+
+/**
+ * @desc    Get my complaints (for citizens)
+ * @route   GET /api/v1/complaints/my
+ * @access  Protected - Citizen
+ */
+const getMyComplaints = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw new AppError('Authentication required', HTTP_STATUS.UNAUTHORIZED);
+  }
+
+  const filters = {
+    citizenUser: req.user._id,
+    page: parseInt(req.query.page, 10) || 1,
+    limit: parseInt(req.query.limit, 10) || 20,
+    status: req.query.status,
+  };
+
+  const result = await complaintService.getComplaints(filters);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: {
+      complaints: result.complaints.map(formatComplaintResponse),
+      pagination: result.pagination,
+    },
+  });
+});
+
+/**
  * Format complaint for API response
  */
 const formatComplaintResponse = (complaint) => {
@@ -311,6 +624,21 @@ const formatComplaintResponse = (complaint) => {
       area: complaint.location.area,
       ward: complaint.location.ward,
       pincode: complaint.location.pincode,
+    },
+    // Hierarchy information
+    hierarchy: {
+      ucId: complaint.ucId,
+      townId: complaint.townId,
+      cityId: complaint.cityId,
+      ucName: complaint.ucId?.name,
+      townName: complaint.townId?.name,
+      cityName: complaint.cityId?.name,
+    },
+    // SLA tracking
+    sla: {
+      deadline: complaint.slaDeadline,
+      targetHours: complaint.slaHours,
+      breach: complaint.slaBreach,
     },
     citizenInfo: {
       name: complaint.citizenInfo?.name || 'Anonymous',
@@ -359,4 +687,7 @@ module.exports = {
   getGlobalHeatmap,
   getProfileHeatmap,
   getAIStats,
+  submitCitizenFeedback,
+  getSLABreaches,
+  getMyComplaints,
 };

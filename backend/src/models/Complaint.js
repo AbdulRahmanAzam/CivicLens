@@ -3,11 +3,12 @@ const { generateComplaintId } = require('../utils/helpers');
 
 /**
  * Status history sub-schema
+ * Updated with new lifecycle: submitted → acknowledged → in_progress → resolved → closed → citizen_feedback
  */
 const statusHistorySchema = new mongoose.Schema({
   status: {
     type: String,
-    enum: ['reported', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected'],
+    enum: ['submitted', 'acknowledged', 'in_progress', 'resolved', 'closed', 'citizen_feedback', 'rejected'],
     required: true,
   },
   timestamp: {
@@ -15,7 +16,12 @@ const statusHistorySchema = new mongoose.Schema({
     default: Date.now,
   },
   updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  updatedByRole: {
     type: String,
+    enum: ['citizen', 'uc_chairman', 'town_chairman', 'mayor', 'website_admin', 'system'],
     default: 'system',
   },
   remarks: String,
@@ -25,6 +31,10 @@ const statusHistorySchema = new mongoose.Schema({
  * Citizen info sub-schema
  */
 const citizenInfoSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
   name: {
     type: String,
     trim: true,
@@ -57,6 +67,34 @@ const imageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: {},
   },
+  uploadedAt: {
+    type: Date,
+    default: Date.now,
+  },
+}, { _id: false });
+
+/**
+ * Citizen feedback sub-schema (after closure)
+ */
+const citizenFeedbackSchema = new mongoose.Schema({
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    required: true,
+  },
+  comment: {
+    type: String,
+    maxlength: [1000, 'Feedback comment cannot exceed 1000 characters'],
+  },
+  feedbackAt: {
+    type: Date,
+    default: Date.now,
+  },
+  satisfactionLevel: {
+    type: String,
+    enum: ['very_dissatisfied', 'dissatisfied', 'neutral', 'satisfied', 'very_satisfied'],
+  },
 }, { _id: false });
 
 /**
@@ -65,16 +103,12 @@ const imageSchema = new mongoose.Schema({
 const resolutionSchema = new mongoose.Schema({
   description: String,
   resolvedAt: Date,
-  resolvedBy: String,
-  citizenFeedback: {
-    rating: {
-      type: Number,
-      min: 1,
-      max: 5,
-    },
-    comment: String,
-    feedbackAt: Date,
+  resolvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   },
+  closedAt: Date,
+  photos: [imageSchema], // Resolution proof photos
 }, { _id: false });
 
 /**
@@ -99,10 +133,73 @@ const severitySchema = new mongoose.Schema({
     areaImpact: { type: Number, default: 0 },
     citizenUrgency: { type: Number, default: 0 },
   },
+  // Timestamp when severity was locked (immutable after creation)
+  lockedAt: {
+    type: Date,
+  },
+}, { _id: false });
+
+/**
+ * SLA tracking sub-schema
+ */
+const slaSchema = new mongoose.Schema({
+  // SLA deadline based on category
+  deadline: {
+    type: Date,
+  },
+  // SLA hours from category at time of creation
+  targetHours: {
+    type: Number,
+  },
+  // Whether SLA was breached
+  breached: {
+    type: Boolean,
+    default: false,
+  },
+  breachedAt: {
+    type: Date,
+  },
+  // Actual resolution time in hours
+  actualResolutionHours: {
+    type: Number,
+  },
+}, { _id: false });
+
+/**
+ * UC Assignment sub-schema
+ */
+const ucAssignmentSchema = new mongoose.Schema({
+  method: {
+    type: String,
+    enum: ['geo_fence', 'nearest', 'manual'],
+    required: true,
+  },
+  confidence: {
+    type: String,
+    enum: ['exact', 'high', 'medium', 'low'],
+  },
+  distance: {
+    type: Number, // Distance in meters (for nearest assignment)
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  // In case of reassignment
+  previousUCId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UC',
+  },
+  reassignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  reassignReason: String,
 }, { _id: false });
 
 /**
  * Main Complaint Schema
+ * Updated with UC/Town/City hierarchy and immutable fields
  */
 const complaintSchema = new mongoose.Schema({
   complaintId: {
@@ -204,11 +301,38 @@ const complaintSchema = new mongoose.Schema({
     enum: ['web', 'mobile', 'whatsapp', 'voice'],
     default: 'web',
   },
+
+  // UC/Town/City hierarchy references
+  ucId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UC',
+    required: [true, 'UC assignment is required'],
+    index: true,
+  },
+  townId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Town',
+    required: [true, 'Town reference is required'],
+    index: true,
+  },
+  cityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'City',
+    required: [true, 'City reference is required'],
+    index: true,
+  },
+
+  // UC assignment details
+  ucAssignment: {
+    type: ucAssignmentSchema,
+  },
+
+  // Updated status lifecycle
   status: {
     current: {
       type: String,
-      enum: ['reported', 'acknowledged', 'in_progress', 'resolved', 'closed', 'rejected'],
-      default: 'reported',
+      enum: ['submitted', 'acknowledged', 'in_progress', 'resolved', 'closed', 'citizen_feedback', 'rejected'],
+      default: 'submitted',
     },
     history: [statusHistorySchema],
   },
@@ -216,6 +340,13 @@ const complaintSchema = new mongoose.Schema({
     type: severitySchema,
     default: () => ({}),
   },
+
+  // SLA tracking
+  sla: {
+    type: slaSchema,
+    default: () => ({}),
+  },
+
   duplicateOf: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Complaint',
@@ -224,14 +355,22 @@ const complaintSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Complaint',
   }],
-  assignedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  },
+
   resolution: {
     type: resolutionSchema,
     default: null,
   },
+
+  // Citizen feedback (after closure)
+  citizenFeedback: {
+    type: citizenFeedbackSchema,
+  },
+
+  // Immutability tracking
+  immutableFieldsLockedAt: {
+    type: Date,
+  },
+
   metadata: {
     ipAddress: String,
     userAgent: String,
@@ -262,32 +401,260 @@ complaintSchema.index({ 'status.current': 1 });
 complaintSchema.index({ createdAt: -1 });
 // Severity score for sorting
 complaintSchema.index({ 'severity.score': -1 });
+// Compound index for UC-status queries
+complaintSchema.index({ ucId: 1, 'status.current': 1 });
+// Compound index for Town-status queries
+complaintSchema.index({ townId: 1, 'status.current': 1 });
+// Compound index for City-status queries
+complaintSchema.index({ cityId: 1, 'status.current': 1 });
 // Compound index for area-category queries
 complaintSchema.index({ 'location.area': 1, 'category.primary': 1 });
 // Text index for search
 complaintSchema.index({ description: 'text', 'location.address': 'text' });
+// Index for SLA breach queries
+complaintSchema.index({ 'sla.breached': 1, 'sla.deadline': 1 });
+// Index for citizen complaints
+complaintSchema.index({ 'citizenInfo.userId': 1 });
 // Index for heatmap profile queries (resolved complaints by entity)
 complaintSchema.index({ 'resolution.resolvedBy': 1, 'status.current': 1 });
 
+// Immutable fields list
+const IMMUTABLE_FIELDS = [
+  'description',
+  'images',
+  'category.primary',
+  'severity.score',
+  'severity.priority',
+  'citizenInfo',
+  'location.coordinates',
+];
+
 /**
- * Pre-save middleware to generate complaintId
+ * Pre-save middleware to generate complaintId and lock immutable fields
  */
-complaintSchema.pre('save', async function(next) {
-  if (this.isNew && !this.complaintId) {
-    this.complaintId = await generateComplaintId();
+complaintSchema.pre('save', async function() {
+  if (this.isNew) {
+    // Generate complaint ID
+    if (!this.complaintId) {
+      this.complaintId = await generateComplaintId();
+    }
     
-    // Initialize status history with 'reported' status
+    // Initialize status history with 'submitted' status
     if (!this.status.history || this.status.history.length === 0) {
       this.status.history = [{
-        status: 'reported',
+        status: 'submitted',
         timestamp: new Date(),
-        updatedBy: 'system',
+        updatedByRole: 'system',
         remarks: 'Complaint submitted',
       }];
     }
+
+    // Lock immutable fields
+    this.immutableFieldsLockedAt = new Date();
+    this.severity.lockedAt = new Date();
   }
+});
+
+/**
+ * Pre-update middleware to prevent modification of immutable fields
+ */
+complaintSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function(next) {
+  const update = this.getUpdate();
+  
+  // Check for attempts to modify immutable fields
+  const modifyingImmutable = IMMUTABLE_FIELDS.some(field => {
+    // Check $set
+    if (update.$set && (update.$set[field] !== undefined || 
+        Object.keys(update.$set).some(k => k.startsWith(field + '.')))) {
+      return true;
+    }
+    // Check direct field updates
+    if (update[field] !== undefined) {
+      return true;
+    }
+    return false;
+  });
+
+  if (modifyingImmutable) {
+    const error = new Error('Cannot modify immutable complaint fields: ' + IMMUTABLE_FIELDS.join(', '));
+    error.code = 'IMMUTABLE_FIELD_VIOLATION';
+    return next(error);
+  }
+  
   next();
 });
+
+/**
+ * Instance method to update status
+ * Only UC Chairman can update status (validated at controller/middleware level)
+ */
+complaintSchema.methods.updateStatus = async function(newStatus, updatedBy, updatedByRole, remarks = '') {
+  // Valid status transitions for new lifecycle
+  const validTransitions = {
+    submitted: ['acknowledged', 'rejected'],
+    acknowledged: ['in_progress', 'rejected'],
+    in_progress: ['resolved', 'rejected'],
+    resolved: ['closed'],
+    closed: ['citizen_feedback'],
+    citizen_feedback: [], // Terminal state
+    rejected: [], // Terminal state
+  };
+
+  const currentStatus = this.status.current;
+  
+  if (!validTransitions[currentStatus]?.includes(newStatus)) {
+    throw new Error(`Invalid status transition from ${currentStatus} to ${newStatus}`);
+  }
+
+  this.status.current = newStatus;
+  this.status.history.push({
+    status: newStatus,
+    timestamp: new Date(),
+    updatedBy,
+    updatedByRole,
+    remarks,
+  });
+
+  // Handle resolution
+  if (newStatus === 'resolved') {
+    if (!this.resolution) {
+      this.resolution = {};
+    }
+    this.resolution.resolvedAt = new Date();
+    this.resolution.resolvedBy = updatedBy;
+
+    // Calculate actual resolution time for SLA
+    if (this.sla && this.createdAt) {
+      const resolutionHours = (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60);
+      this.sla.actualResolutionHours = Math.round(resolutionHours * 10) / 10;
+      
+      // Check SLA breach
+      if (this.sla.targetHours && resolutionHours > this.sla.targetHours) {
+        this.sla.breached = true;
+        this.sla.breachedAt = this.sla.deadline || new Date();
+      }
+    }
+  }
+
+  // Handle closure
+  if (newStatus === 'closed') {
+    if (!this.resolution) {
+      this.resolution = {};
+    }
+    this.resolution.closedAt = new Date();
+  }
+
+  return this.save();
+};
+
+/**
+ * Instance method to add citizen feedback
+ * Only the citizen who submitted can provide feedback (validated at controller level)
+ */
+complaintSchema.methods.addFeedback = async function(rating, comment, satisfactionLevel) {
+  if (this.status.current !== 'closed') {
+    throw new Error('Feedback can only be provided after complaint is closed');
+  }
+
+  if (this.citizenFeedback?.rating) {
+    throw new Error('Feedback has already been provided');
+  }
+
+  this.citizenFeedback = {
+    rating,
+    comment,
+    satisfactionLevel,
+    feedbackAt: new Date(),
+  };
+
+  this.status.current = 'citizen_feedback';
+  this.status.history.push({
+    status: 'citizen_feedback',
+    timestamp: new Date(),
+    updatedByRole: 'citizen',
+    remarks: `Citizen provided feedback: ${rating}/5`,
+  });
+
+  return this.save();
+};
+
+/**
+ * Instance method to reassign to different UC
+ * Only Mayor can reassign (validated at controller level)
+ */
+complaintSchema.methods.reassignUC = async function(newUCId, reassignedBy, reason) {
+  const UC = mongoose.model('UC');
+  const newUC = await UC.findById(newUCId).populate('town');
+  
+  if (!newUC) {
+    throw new Error('Target UC not found');
+  }
+
+  // Store previous assignment
+  this.ucAssignment = {
+    method: 'manual',
+    confidence: 'exact',
+    assignedAt: new Date(),
+    previousUCId: this.ucId,
+    reassignedBy,
+    reassignReason: reason,
+  };
+
+  this.ucId = newUCId;
+  this.townId = newUC.town._id;
+  this.cityId = newUC.town.city;
+
+  return this.save();
+};
+
+/**
+ * Static method to find complaints by UC
+ */
+complaintSchema.statics.findByUC = function(ucId, options = {}) {
+  const query = { ucId };
+  if (options.status) {
+    query['status.current'] = options.status;
+  }
+  return this.find(query).sort({ createdAt: -1 });
+};
+
+/**
+ * Static method to find complaints by Town
+ */
+complaintSchema.statics.findByTown = function(townId, options = {}) {
+  const query = { townId };
+  if (options.status) {
+    query['status.current'] = options.status;
+  }
+  return this.find(query).sort({ createdAt: -1 });
+};
+
+/**
+ * Static method to find complaints by City
+ */
+complaintSchema.statics.findByCity = function(cityId, options = {}) {
+  const query = { cityId };
+  if (options.status) {
+    query['status.current'] = options.status;
+  }
+  return this.find(query).sort({ createdAt: -1 });
+};
+
+/**
+ * Static method to find SLA breached complaints
+ */
+complaintSchema.statics.findSLABreached = function(entityType, entityId) {
+  const query = {
+    'sla.breached': true,
+    'status.current': { $nin: ['resolved', 'closed', 'citizen_feedback', 'rejected'] },
+  };
+  
+  if (entityType === 'uc') query.ucId = entityId;
+  else if (entityType === 'town') query.townId = entityId;
+  else if (entityType === 'city') query.cityId = entityId;
+  
+  return this.find(query).sort({ 'sla.deadline': 1 });
+};
 
 /**
  * Static method to find complaints near a location
@@ -318,6 +685,15 @@ complaintSchema.statics.getStats = async function(filters = {}) {
   if (filters.dateTo) {
     matchStage.createdAt = { ...matchStage.createdAt, $lte: new Date(filters.dateTo) };
   }
+  if (filters.ucId) {
+    matchStage.ucId = mongoose.Types.ObjectId(filters.ucId);
+  }
+  if (filters.townId) {
+    matchStage.townId = mongoose.Types.ObjectId(filters.townId);
+  }
+  if (filters.cityId) {
+    matchStage.cityId = mongoose.Types.ObjectId(filters.cityId);
+  }
   if (filters.area) {
     matchStage['location.area'] = filters.area;
   }
@@ -338,10 +714,14 @@ complaintSchema.statics.getStats = async function(filters = {}) {
           { $sort: { count: -1 } },
           { $limit: 10 },
         ],
+        slaBreaches: [
+          { $match: { 'sla.breached': true } },
+          { $count: 'count' },
+        ],
         avgResolutionTime: [
           {
             $match: {
-              'status.current': { $in: ['resolved', 'closed'] },
+              'status.current': { $in: ['resolved', 'closed', 'citizen_feedback'] },
               'resolution.resolvedAt': { $exists: true },
             },
           },
@@ -350,58 +730,26 @@ complaintSchema.statics.getStats = async function(filters = {}) {
               resolutionTime: {
                 $divide: [
                   { $subtract: ['$resolution.resolvedAt', '$createdAt'] },
-                  3600000, // Convert to hours
+                  3600000,
                 ],
               },
             },
           },
           { $group: { _id: null, avgTime: { $avg: '$resolutionTime' } } },
         ],
+        avgFeedbackRating: [
+          {
+            $match: {
+              'citizenFeedback.rating': { $exists: true },
+            },
+          },
+          { $group: { _id: null, avgRating: { $avg: '$citizenFeedback.rating' } } },
+        ],
       },
     },
   ]);
 
   return stats[0];
-};
-
-/**
- * Instance method to update status
- */
-complaintSchema.methods.updateStatus = async function(newStatus, updatedBy, remarks = '') {
-  // Valid status transitions
-  const validTransitions = {
-    reported: ['acknowledged', 'rejected'],
-    acknowledged: ['in_progress', 'rejected'],
-    in_progress: ['resolved', 'rejected'],
-    resolved: ['closed'],
-    closed: [],
-    rejected: [],
-  };
-
-  const currentStatus = this.status.current;
-  
-  if (!validTransitions[currentStatus].includes(newStatus)) {
-    throw new Error(`Invalid status transition from ${currentStatus} to ${newStatus}`);
-  }
-
-  this.status.current = newStatus;
-  this.status.history.push({
-    status: newStatus,
-    timestamp: new Date(),
-    updatedBy,
-    remarks,
-  });
-
-  // If resolved, set resolution timestamp
-  if (newStatus === 'resolved') {
-    if (!this.resolution) {
-      this.resolution = {};
-    }
-    this.resolution.resolvedAt = new Date();
-    this.resolution.resolvedBy = updatedBy;
-  }
-
-  return this.save();
 };
 
 const Complaint = mongoose.model('Complaint', complaintSchema);

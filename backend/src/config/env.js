@@ -28,6 +28,18 @@ const env = {
   
   // Google Maps
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+
+  // Email (SMTP)
+  email: {
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+    smtp: {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT, 10) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  },
   
   // JWT
   jwt: {
@@ -39,6 +51,30 @@ const env = {
   
   // Frontend URL (for email links)
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
+
+  // GROQ / AI
+  groqApiKey: process.env.GROQ_API_KEY,
+  ai: {
+    classificationEnabled: process.env.AI_CLASSIFICATION_ENABLED !== 'false',
+    fallbackToLocal: process.env.AI_FALLBACK_TO_LOCAL !== 'false',
+  },
+
+  // Speech / Whisper
+  whisper: {
+    binPath: process.env.WHISPER_BIN_PATH,
+    modelPath: process.env.WHISPER_MODEL_PATH,
+    maxDuration: parseInt(process.env.SPEECH_MAX_DURATION, 10) || 30,
+    simulationMode: process.env.SPEECH_SIMULATION_MODE === 'true',
+  },
+
+  // WhatsApp
+  whatsapp: {
+    authDir: process.env.WHATSAPP_AUTH_DIR || './whatsapp-auth',
+    enabled: process.env.WHATSAPP_ENABLED !== 'false',
+  },
+
+  // Location web link fallback
+  enableLocationWebLink: process.env.ENABLE_LOCATION_WEB_LINK === 'true',
   
   // Helper methods
   isDevelopment: () => env.nodeEnv === 'development',
@@ -66,6 +102,11 @@ const validateEnv = () => {
   // Warn about Google Maps API key
   if (!env.googleMapsApiKey) {
     console.warn('Warning: Google Maps API key not configured. Reverse geocoding will be disabled.');
+  }
+
+  // Warn about SMTP email config
+  if (!env.email.smtp.host || !env.email.smtp.user || !env.email.smtp.pass) {
+    console.warn('Warning: SMTP credentials not configured. Outgoing email will be disabled.');
   }
 };
 

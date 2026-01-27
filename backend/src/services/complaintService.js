@@ -4,6 +4,7 @@ const cloudinaryService = require('./cloudinaryService');
 const classificationService = require('./classificationService');
 const duplicateService = require('./duplicateService');
 const severityService = require('./severityService');
+const ucAssignmentService = require('./ucAssignmentService');
 const {
   buildComplaintQuery,
   buildSortObject,
@@ -92,12 +93,17 @@ class ComplaintService {
     console.log(`[AI Pipeline] Severity: ${severity.score}/10 (${severity.priority})`);
 
     // Create the complaint with AI-enriched data
+    // Calculate SLA deadline based on category
+    const slaInfo = await ucAssignmentService.calculateSLADeadline(classification.category);
+    
     const complaint = new Complaint({
       citizenInfo: {
         name,
         phone,
         email,
       },
+      // Link to citizen user if authenticated
+      citizenUser: data.citizenUser,
       description,
       category: {
         primary: classification.category,
@@ -109,6 +115,13 @@ class ComplaintService {
         needsReview: classification.needsReview,
       },
       location,
+      // Hierarchy assignment from controller
+      ucId: data.ucId,
+      townId: data.townId,
+      cityId: data.cityId,
+      // SLA tracking
+      slaDeadline: slaInfo.deadline,
+      slaHours: slaInfo.targetHours,
       images,
       source,
       severity: {
@@ -125,6 +138,7 @@ class ComplaintService {
           duplicateCheckDetails: duplicateCheck.checkDetails,
           severityDetails: severity.details,
         },
+        ucAssignment: data.ucAssignment,
       },
     });
 
@@ -160,6 +174,12 @@ class ComplaintService {
       radius = GEO.DEFAULT_RADIUS,
       sort_by,
       sort_order,
+      // New hierarchy filters
+      ucId,
+      townId,
+      cityId,
+      citizenUser,
+      slaBreach,
       ...otherFilters
     } = filters;
 
@@ -167,6 +187,13 @@ class ComplaintService {
     let query = buildComplaintQuery(otherFilters);
     let complaints;
     let totalCount;
+
+    // Add hierarchy filters
+    if (ucId) query.ucId = ucId;
+    if (townId) query.townId = townId;
+    if (cityId) query.cityId = cityId;
+    if (citizenUser) query.citizenUser = citizenUser;
+    if (slaBreach) query.slaBreach = true;
 
     // Handle geo-queries
     if (lat && lng) {
@@ -203,12 +230,15 @@ class ComplaintService {
     }
     totalCount = await Complaint.countDocuments(countQuery);
 
-    // Get complaints
+    // Get complaints with hierarchy population
     complaints = await Complaint.find(query)
       .sort(sort)
       .skip(skip)
       .limit(limit)
       .populate('assignedTo', 'name department')
+      .populate('ucId', 'name code')
+      .populate('townId', 'name code')
+      .populate('cityId', 'name code')
       .lean();
 
     // Generate pagination metadata
@@ -228,14 +258,22 @@ class ComplaintService {
     let complaint = await Complaint.findOne({ complaintId: id })
       .populate('assignedTo', 'name department')
       .populate('duplicateOf', 'complaintId description')
-      .populate('linkedComplaints', 'complaintId description status.current');
+      .populate('linkedComplaints', 'complaintId description status.current')
+      .populate('ucId', 'name code')
+      .populate('townId', 'name code')
+      .populate('cityId', 'name code')
+      .populate('citizenUser', 'name email');
 
     if (!complaint) {
       // Try ObjectId
       complaint = await Complaint.findById(id)
         .populate('assignedTo', 'name department')
         .populate('duplicateOf', 'complaintId description')
-        .populate('linkedComplaints', 'complaintId description status.current');
+        .populate('linkedComplaints', 'complaintId description status.current')
+        .populate('ucId', 'name code')
+        .populate('townId', 'name code')
+        .populate('cityId', 'name code')
+        .populate('citizenUser', 'name email');
     }
 
     if (!complaint) {
@@ -248,11 +286,29 @@ class ComplaintService {
   /**
    * Update complaint status
    */
-  async updateStatus(id, { status, remarks, updatedBy }) {
+  async updateStatus(id, { status, remarks, updatedBy, rating, feedback, citizenResolved }) {
     const complaint = await this.getComplaintById(id);
     
     // Use the model's updateStatus method
     await complaint.updateStatus(status, updatedBy, remarks);
+
+    // Handle citizen feedback for resolved complaints
+    if (status === 'citizen_feedback' && rating) {
+      complaint.resolution = complaint.resolution || {};
+      complaint.resolution.feedback = {
+        rating,
+        comment: feedback,
+        citizenResolved: citizenResolved !== false,
+        submittedAt: new Date(),
+      };
+      await complaint.save();
+    }
+
+    // Check and mark SLA breach
+    if (!complaint.slaBreach && complaint.slaDeadline && new Date() > complaint.slaDeadline) {
+      complaint.slaBreach = true;
+      await complaint.save();
+    }
 
     return complaint;
   }
