@@ -368,10 +368,10 @@ const CitizenDashboard = () => {
 
   // Quick stats computed from real data
   const quickStats = [
-    { label: 'Total Reports', value: String(stats.total), change: 'All time', color: 'primary' },
-    { label: 'Resolved', value: String(stats.resolved), change: stats.total > 0 ? `${Math.round((stats.resolved / stats.total) * 100)}% success` : '0%', color: 'secondary' },
-    { label: 'In Progress', value: String(stats.inProgress), change: 'Active', color: 'blue' },
-    { label: 'Pending', value: String(stats.pending), change: 'Awaiting review', color: 'amber' },
+      { label: 'Total Reports', value: String(stats.total), change: 'All time', color: 'green' },
+    { label: 'Resolved', value: String(stats.resolved), change: stats.total > 0 ? `${Math.round((stats.resolved / stats.total) * 100)}% success` : '0%', color: 'emerald' },
+    { label: 'In Progress', value: String(stats.inProgress), change: 'Active', color: 'teal' },
+    { label: 'Pending', value: String(stats.pending), change: 'Awaiting review', color: 'lime' },
   ];
 
   const getStatusStyles = (status) => {
@@ -379,13 +379,18 @@ const CitizenDashboard = () => {
     switch (statusLower) {
       case 'resolved':
       case 'closed':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-50 text-emerald-700 border-emerald-300';
       case 'in_progress':
       case 'in progress':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'bg-teal-50 text-teal-700 border-teal-300';
       case 'acknowledged':
       case 'in review':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-lime-50 text-lime-700 border-lime-300';
+      case 'submitted':
+      case 'reported':
+        return 'bg-green-50 text-green-700 border-green-300';
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border-red-300';
       default: 
         return 'bg-gray-50 text-gray-700 border-gray-200';
     }
@@ -411,7 +416,7 @@ const CitizenDashboard = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+              <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
                 Citizen Portal
               </span>
             </div>
@@ -420,7 +425,7 @@ const CitizenDashboard = () => {
           </div>
           <Link
             to="/map"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm hover:shadow-md"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-green-500/25 transition-all"
           >
             <Icons.Map />
             View City Map
@@ -431,10 +436,10 @@ const CitizenDashboard = () => {
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {quickStats.map((stat, index) => (
-          <div key={index} className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300 group">
+          <div key={index} className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300 group hover:border-green-200">
             <div className="flex items-start justify-between mb-3">
-              <div className={`p-2 rounded-xl ${stat.color === 'primary' ? 'bg-primary/10 text-primary' : stat.color === 'secondary' ? 'bg-secondary/10 text-secondary' : stat.color === 'blue' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                {stat.color === 'primary' ? <Icons.Report /> : stat.color === 'secondary' ? <Icons.Check /> : stat.color === 'blue' ? <Icons.Clock /> : <Icons.AlertCircle />}
+              <div className={`p-2 rounded-xl ${stat.color === 'green' ? 'bg-green-100 text-green-600' : stat.color === 'emerald' ? 'bg-emerald-100 text-emerald-600' : stat.color === 'teal' ? 'bg-teal-100 text-teal-600' : 'bg-lime-100 text-lime-600'}`}>
+                {stat.color === 'green' ? <Icons.Report /> : stat.color === 'emerald' ? <Icons.Check /> : stat.color === 'teal' ? <Icons.Clock /> : <Icons.AlertCircle />}
               </div>
               <Icons.TrendingUp />
             </div>
@@ -453,11 +458,11 @@ const CitizenDashboard = () => {
             onClick={() => setActiveOperation(op.id)}
             className={`flex items-center gap-3 px-5 py-3 rounded-xl border-2 transition-all duration-200 min-w-fit ${
               activeOperation === op.id
-                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25'
-                : 'bg-white border-foreground/10 hover:border-primary/30 hover:bg-primary/5'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white border-green-600 shadow-lg shadow-green-500/25'
+                : 'bg-white border-foreground/10 hover:border-green-300 hover:bg-green-50'
             }`}
           >
-            <div className={`p-1.5 rounded-lg ${activeOperation === op.id ? 'bg-white/20' : 'bg-primary/10'}`}>
+            <div className={`p-1.5 rounded-lg ${activeOperation === op.id ? 'bg-white/20' : 'bg-green-100'}`}>
               <op.icon />
             </div>
             <div className="text-left">
@@ -471,12 +476,12 @@ const CitizenDashboard = () => {
       {/* Report Issue Section */}
       {activeOperation === 'report' && (
         <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-6 py-5 border-b border-foreground/10">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-primary/10 text-primary"><Icons.Report /></div>
+              <div className="p-2.5 rounded-xl bg-white/20 text-white"><Icons.Report /></div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Report a New Issue</h3>
-                <p className="text-sm text-foreground/60">Describe the problem and we'll route it to the right department</p>
+                <h3 className="text-lg font-semibold text-white">Report a New Issue</h3>
+                <p className="text-sm text-white/80">Describe the problem and we'll route it to the right department</p>
               </div>
             </div>
           </div>
@@ -484,11 +489,11 @@ const CitizenDashboard = () => {
             <div className="grid md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">Issue Title <span className="text-red-500">*</span></label>
-                <input type="text" name="title" value={reportForm.title} onChange={handleReportChange} placeholder="E.g., Broken traffic light (min 5 chars)" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required minLength={5} maxLength={100} />
+                <input type="text" name="title" value={reportForm.title} onChange={handleReportChange} placeholder="E.g., Broken traffic light (min 5 chars)" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all" required minLength={5} maxLength={100} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">Category <span className="text-red-500">*</span></label>
-                <select name="category" value={reportForm.category} onChange={handleReportChange} className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required>
+                <select name="category" value={reportForm.category} onChange={handleReportChange} className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all" required>
                   <option value="">Select a category...</option>
                   {categories.length > 0 ? (
                     categories.map((cat) => (
@@ -511,15 +516,15 @@ const CitizenDashboard = () => {
             <div className="space-y-3">
               <label className="text-sm font-semibold text-foreground">Location</label>
               <div className="flex gap-3">
-                <input type="text" name="location" value={reportForm.location} onChange={handleReportChange} placeholder="Street address or landmark" className="flex-1 rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" />
+                <input type="text" name="location" value={reportForm.location} onChange={handleReportChange} placeholder="Street address or landmark" className="flex-1 rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all" />
                 <button 
                   type="button" 
                   onClick={detectLocationAndUC}
                   disabled={detectingLocation}
-                  className="px-4 py-3 rounded-xl border-2 border-primary/30 bg-primary/5 text-primary font-medium text-sm hover:bg-primary/10 disabled:opacity-50 transition-all flex items-center gap-2"
+                  className="px-4 py-3 rounded-xl border-2 border-green-300 bg-green-50 text-green-700 font-medium text-sm hover:bg-green-100 disabled:opacity-50 transition-all flex items-center gap-2"
                 >
                   {detectingLocation ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    <div className="animate-spin w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full"></div>
                   ) : (
                     <Icons.Map />
                   )}
@@ -528,8 +533,8 @@ const CitizenDashboard = () => {
               </div>
               {/* UC Detection Info */}
               {detectedUC && (
-                <div className="rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
-                  <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
+                <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 flex items-center gap-3">
+                  <div className="p-1.5 rounded-full bg-emerald-100 text-emerald-600"><Icons.Check /></div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">
                       UC Detected: {detectedUC.name}
@@ -551,17 +556,17 @@ const CitizenDashboard = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Description <span className="text-red-500">*</span></label>
-              <textarea name="description" value={reportForm.description} onChange={handleReportChange} placeholder="Provide detailed information (min 20 chars)..." rows={4} className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all resize-none" required minLength={20} maxLength={1000} />
+              <textarea name="description" value={reportForm.description} onChange={handleReportChange} placeholder="Provide detailed information (min 20 chars)..." rows={4} className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all resize-none" required minLength={20} maxLength={1000} />
               <p className="text-xs text-foreground/40 text-right">{reportForm.description.length}/1000</p>
             </div>
             
             {/* Image Upload Section */}
             <div className="space-y-3">
               <label className="text-sm font-semibold text-foreground">Upload Evidence (Optional)</label>
-              <div className="border-2 border-dashed border-foreground/20 rounded-xl p-6 text-center hover:border-primary/50 transition-all bg-foreground/[0.02]">
+              <div className="border-2 border-dashed border-green-200 rounded-xl p-6 text-center hover:border-green-400 transition-all bg-green-50/30">
                 <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="image-upload" />
                 <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-3">
-                  <div className="p-3 rounded-full bg-primary/10 text-primary"><Icons.Camera /></div>
+                  <div className="p-3 rounded-full bg-green-100 text-green-600"><Icons.Camera /></div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Click to upload images</p>
                     <p className="text-xs text-foreground/50 mt-1">PNG, JPG up to 5MB each (max 5 images)</p>
@@ -584,7 +589,7 @@ const CitizenDashboard = () => {
               <button 
                 type="submit" 
                 disabled={submitting}
-                className="px-8 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 disabled:bg-primary/50 transition-all shadow-sm hover:shadow-lg hover:shadow-primary/25 flex items-center gap-2"
+                className="px-8 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-green-500/25 disabled:opacity-50 transition-all flex items-center gap-2"
               >
                 {submitting ? (
                   <>
@@ -604,8 +609,8 @@ const CitizenDashboard = () => {
             </div>
           )}
           {reportSuccess && (
-            <div className="mx-6 mb-6 rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
-              <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
+            <div className="mx-6 mb-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 flex items-center gap-3">
+              <div className="p-1.5 rounded-full bg-emerald-100 text-emerald-600"><Icons.Check /></div>
               <div><p className="text-sm font-semibold text-foreground">Issue submitted successfully!</p><p className="text-xs text-foreground/60">Tracking ID created</p></div>
             </div>
           )}
@@ -615,19 +620,19 @@ const CitizenDashboard = () => {
       {/* Feedback Section */}
       {activeOperation === 'feedback' && (
         <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-secondary/5 to-primary/5 px-6 py-5 border-b border-foreground/10">
+          <div className="bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-secondary/10 text-secondary"><Icons.Feedback /></div>
+              <div className="p-2.5 rounded-xl bg-white/20 text-white"><Icons.Feedback /></div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Resolution Feedback</h3>
-                <p className="text-sm text-foreground/60">Help us improve by sharing your experience</p>
+                <h3 className="text-lg font-semibold text-white">Resolution Feedback</h3>
+                <p className="text-sm text-white/80">Help us improve by sharing your experience</p>
               </div>
             </div>
           </div>
           <form onSubmit={handleSubmitFeedback} className="p-6 space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Select Resolved Issue</label>
-              <select name="issueId" value={feedbackForm.issueId} onChange={handleFeedbackChange} className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required>
+              <select name="issueId" value={feedbackForm.issueId} onChange={handleFeedbackChange} className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all" required>
                 <option value="">Choose an issue to rate...</option>
                 {resolvedIssues.map((issue) => (<option key={issue.id} value={issue.id}>{issue.complaintId || issue.id} — {issue.title}</option>))}
               </select>
@@ -642,7 +647,7 @@ const CitizenDashboard = () => {
                   { value: 'satisfied', emoji: '😊', label: 'Satisfied', color: 'border-green-300 bg-green-50' },
                   { value: 'very_satisfied', emoji: '🤩', label: 'Very Satisfied', color: 'border-emerald-300 bg-emerald-50' }
                 ].map((opt) => (
-                  <label key={opt.value} className={`flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-3 cursor-pointer transition-all min-w-[90px] ${feedbackForm.satisfaction === opt.value ? `${opt.color} border-primary ring-2 ring-primary/20` : 'border-foreground/10 hover:border-foreground/20 hover:bg-foreground/[0.02]'}`}>
+                  <label key={opt.value} className={`flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-3 cursor-pointer transition-all min-w-[90px] ${feedbackForm.satisfaction === opt.value ? `${opt.color} border-green-500 ring-2 ring-green-500/20` : 'border-foreground/10 hover:border-foreground/20 hover:bg-foreground/[0.02]'}`}>
                     <input type="radio" name="satisfaction" value={opt.value} checked={feedbackForm.satisfaction === opt.value} onChange={handleFeedbackChange} className="sr-only" />
                     <span className="text-3xl">{opt.emoji}</span>
                     <span className="text-xs font-medium text-center">{opt.label}</span>
@@ -652,16 +657,16 @@ const CitizenDashboard = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground">Additional Comments (Optional)</label>
-              <textarea name="comments" value={feedbackForm.comments} onChange={handleFeedbackChange} rows={3} placeholder="Share any thoughts..." className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all resize-none" />
+              <textarea name="comments" value={feedbackForm.comments} onChange={handleFeedbackChange} rows={3} placeholder="Share any thoughts..." className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all resize-none" />
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
               <p className="text-xs text-foreground/50">Your feedback helps us improve</p>
-              <button type="submit" className="px-8 py-3 rounded-xl bg-secondary text-white font-semibold text-sm hover:bg-secondary/90 transition-all shadow-sm hover:shadow-lg flex items-center gap-2">Submit Feedback<Icons.ArrowRight /></button>
+              <button type="submit" className="px-8 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-teal-500/25 transition-all flex items-center gap-2">Submit Feedback<Icons.ArrowRight /></button>
             </div>
           </form>
           {feedbackSuccess && (
-            <div className="mx-6 mb-6 rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
-              <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
+            <div className="mx-6 mb-6 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 flex items-center gap-3">
+              <div className="p-1.5 rounded-full bg-emerald-100 text-emerald-600"><Icons.Check /></div>
               <div><p className="text-sm font-semibold text-foreground">Thank you for your feedback!</p></div>
             </div>
           )}
@@ -671,63 +676,129 @@ const CitizenDashboard = () => {
       {/* Browse Issues Section */}
       {activeOperation === 'browse' && (
         <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-primary/5 to-accent/5 px-6 py-5 border-b border-foreground/10">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary"><Icons.Browse /></div>
+                <div className="p-2.5 rounded-xl bg-white/20 text-white"><Icons.Browse /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground">Your Reported Issues</h3>
-                  <p className="text-sm text-foreground/60">Track the status of all your civic reports</p>
+                  <h3 className="text-lg font-semibold text-white">Your Reported Issues</h3>
+                  <p className="text-sm text-white/80">Track the status of all your civic reports</p>
                 </div>
               </div>
-              <div className="px-3 py-1.5 rounded-full bg-foreground/5 text-sm font-medium text-foreground/70">{issues.length} reports</div>
+              <div className="px-4 py-1.5 rounded-full bg-white/20 text-sm font-semibold text-white">{issues.length} reports</div>
             </div>
           </div>
           {loading ? (
             <div className="p-8 text-center">
-              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+              <div className="animate-spin w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full mx-auto mb-2"></div>
               <p className="text-sm text-foreground/60">Loading your complaints...</p>
             </div>
           ) : issues.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-foreground/60 mb-4">You haven't submitted any complaints yet.</p>
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                <Icons.Report />
+              </div>
+              <p className="text-lg font-semibold text-foreground mb-2">No complaints yet</p>
+              <p className="text-foreground/60 mb-6">You haven't submitted any complaints yet.</p>
               <button
                 onClick={() => setActiveOperation('report')}
-                className="px-6 py-2 rounded-xl bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-all"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium text-sm hover:shadow-lg hover:shadow-green-500/25 transition-all"
               >
                 Report Your First Issue
               </button>
             </div>
           ) : (
-            <div className="p-4 space-y-3">
-              {issues.map((issue) => (
-                <div 
-                  key={issue.id} 
-                  className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group cursor-pointer"
-                  onClick={() => navigate(`/citizen/complaints/${issue.id}`)}
-                >
-                  <div className="flex flex-col md:flex-row md:items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`w-2 h-2 rounded-full ${getPriorityDot(issue.severity?.priority || 'medium')}`}></span>
-                        <span className="text-xs font-mono text-foreground/50">{issue.complaintId || issue.id}</span>
-                        <span className="text-xs text-foreground/40">•</span>
-                        <span className="text-xs text-foreground/50">{issue.category?.primary || 'General'}</span>
+            <div className="p-5">
+              <div className="grid gap-4">
+                {issues.map((issue, index) => (
+                  <div 
+                    key={issue.id} 
+                    className="group relative rounded-xl border-2 border-foreground/5 bg-gradient-to-br from-white to-gray-50 p-5 hover:border-green-200 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
+                    onClick={() => navigate(`/citizen/complaints/${issue.id}`)}
+                  >
+                    {/* Decorative accent */}
+                    <div className={`absolute top-0 left-0 w-1 h-full ${
+                      issue.status === 'resolved' || issue.status === 'closed' ? 'bg-emerald-500' :
+                      issue.status === 'in_progress' ? 'bg-teal-500' :
+                      issue.status === 'acknowledged' ? 'bg-lime-500' :
+                      'bg-green-400'
+                    }`}></div>
+                    
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4 pl-3">
+                      {/* Category Icon */}
+                      <div className={`hidden lg:flex w-12 h-12 rounded-xl items-center justify-center flex-shrink-0 ${
+                        issue.category?.primary === 'Roads' ? 'bg-orange-100 text-orange-600' :
+                        issue.category?.primary === 'Water' ? 'bg-blue-100 text-blue-600' :
+                        issue.category?.primary === 'Garbage' ? 'bg-amber-100 text-amber-600' :
+                        issue.category?.primary === 'Electricity' ? 'bg-yellow-100 text-yellow-600' :
+                        'bg-green-100 text-green-600'
+                      }`}>
+                        {issue.category?.primary === 'Roads' ? '🛣️' :
+                         issue.category?.primary === 'Water' ? '💧' :
+                         issue.category?.primary === 'Garbage' ? '🗑️' :
+                         issue.category?.primary === 'Electricity' ? '⚡' :
+                         '📋'}
                       </div>
-                      <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{issue.title}</p>
-                      <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1"><Icons.Clock />Reported {formatDate(issue.createdAt)}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status)}`}>{getDisplayStatus(issue.status)}</span>
-                      <button className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-primary transition-colors"><Icons.ArrowRight /></button>
+                      
+                      {/* Main Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-green-100 text-green-800 text-xs font-mono font-medium">
+                            {issue.complaintId || `#${index + 1}`}
+                          </span>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${getStatusStyles(issue.status)}`}>
+                            {getDisplayStatus(issue.status)}
+                          </span>
+                          <span className="text-xs text-foreground/40 hidden sm:inline">•</span>
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground/60 bg-gray-100 px-2.5 py-0.5 rounded-md">
+                            {issue.category?.primary || 'General'}
+                          </span>
+                        </div>
+                        
+                        <h4 className="text-base font-semibold text-foreground group-hover:text-green-700 transition-colors line-clamp-2 mb-2">
+                          {issue.title || issue.description?.substring(0, 60) || 'Untitled Complaint'}
+                        </h4>
+                        
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-foreground/50">
+                          <span className="flex items-center gap-1">
+                            <Icons.Clock />
+                            {formatDate(issue.createdAt)}
+                          </span>
+                          {issue.severity?.priority && (
+                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded ${
+                              issue.severity.priority === 'high' ? 'bg-red-100 text-red-700' :
+                              issue.severity.priority === 'medium' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                issue.severity.priority === 'high' ? 'bg-red-500' :
+                                issue.severity.priority === 'medium' ? 'bg-amber-500' :
+                                'bg-gray-400'
+                              }`}></span>
+                              {issue.severity.priority.charAt(0).toUpperCase() + issue.severity.priority.slice(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Action Button */}
+                      <div className="flex items-center gap-2">
+                        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 text-green-700 font-medium text-sm hover:bg-green-100 transition-colors">
+                          View Details
+                          <Icons.ArrowRight />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
-          <div className="px-6 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
-            <Link to="/citizen/complaints" className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">View all complaints<Icons.ArrowRight /></Link>
+          <div className="px-6 py-4 border-t border-foreground/10 bg-gradient-to-r from-green-50 to-emerald-50">
+            <Link to="/citizen/complaints" className="text-sm font-semibold text-green-700 hover:text-green-800 flex items-center gap-1 transition-colors">
+              View all complaints
+              <Icons.ArrowRight />
+            </Link>
           </div>
         </section>
       )}

@@ -1,0 +1,24 @@
+{
+  "name": "civiclens-blockchain",
+  "version": "1.0.0",
+  "description": "Blockchain transparency layer for CivicLens complaint management",
+  "main": "hardhat.config.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "verify": "hardhat verify --network sepolia",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "clean": "hardhat clean"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.4"
+  },
+  "keywords": ["blockchain", "ethereum", "sepolia", "complaint-tracking"],
+  "license": "MIT"
+}

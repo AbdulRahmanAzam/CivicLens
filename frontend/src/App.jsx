@@ -30,7 +30,9 @@ import {
   UCChairmanDashboard 
 } from './pages'
 import ShareLocation from './pages/ShareLocation'
+import TransparencyDashboard from './pages/TransparencyDashboard'
 import { MainLayout } from './components/layout'
+import { ChatWidget } from './components/Chatbot'
 
 // Citizen Pages
 import {
@@ -108,6 +110,9 @@ function App() {
           
           {/* WhatsApp Location Sharing - Public */}
           <Route path="/share-location" element={<ShareLocation />} />
+          
+          {/* Transparency Dashboard - Public */}
+          <Route path="/transparency" element={<TransparencyDashboard />} />
           
           {/* Citizen Auth Routes - Public Only (redirect if logged in) */}
           <Route path="/login" element={
@@ -208,6 +213,9 @@ function App() {
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        
+        {/* AI Chatbot Widget - Available on all pages */}
+        <ChatWidget />
       </Router>
     </AuthProvider>
   )

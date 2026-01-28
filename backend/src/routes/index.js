@@ -10,6 +10,7 @@ const hierarchyRoutes = require('./hierarchy');
 const invitationRoutes = require('./invitation');
 const analyticsRoutes = require('./analytics');
 const territoryRoutes = require('./territoryRoutes');
+const chatbotRoutes = require('./chatbotRoutes');
 
 /**
  * API Routes
@@ -51,6 +52,9 @@ router.use('/analytics', analyticsRoutes);
 
 // Territory routes (for map visualization and admin management)
 router.use('/territories', territoryRoutes);
+
+// Chatbot routes (AI assistant)
+router.use('/chatbot', chatbotRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
@@ -137,6 +141,11 @@ router.get('/', (req, res) => {
         'POST /api/v1/territories': 'Create territory (admin)',
         'PUT /api/v1/territories/:id': 'Update territory (admin)',
         'DELETE /api/v1/territories/:id': 'Delete territory (admin)',
+      },
+      chatbot: {
+        'POST /api/v1/chatbot/message': 'Send message to AI chatbot (public)',
+        'GET /api/v1/chatbot/greeting': 'Get chatbot greeting message',
+        'GET /api/v1/chatbot/quick-actions': 'Get quick action suggestions',
       },
     },
   });

@@ -609,32 +609,34 @@ const getMyComplaints = asyncHandler(async (req, res) => {
  * Format complaint for API response
  */
 const formatComplaintResponse = (complaint) => {
+  if (!complaint) return null;
+  
   return {
     id: complaint._id,
     complaintId: complaint.complaintId,
     description: complaint.description,
-    category: {
-      primary: complaint.category.primary,
+    category: complaint.category ? {
+      primary: complaint.category.primary || 'General',
       subcategory: complaint.category.subcategory,
-      urgency: complaint.category.urgency,
-      keywords: complaint.category.keywords,
+      urgency: complaint.category.urgency || 'medium',
+      keywords: complaint.category.keywords || [],
       source: complaint.category.classificationSource,
-      needsReview: complaint.category.needsReview,
-    },
-    status: complaint.status.current,
-    statusHistory: complaint.status.history,
-    severity: {
-      score: complaint.severity.score,
-      priority: complaint.severity.priority,
-      factors: complaint.severity.factors,
-    },
-    location: {
-      coordinates: complaint.location.coordinates,
-      address: complaint.location.address,
+      needsReview: complaint.category.needsReview || false,
+    } : { primary: 'General', urgency: 'medium', keywords: [], needsReview: false },
+    status: complaint.status?.current || 'submitted',
+    statusHistory: complaint.status?.history || [],
+    severity: complaint.severity ? {
+      score: complaint.severity.score || 50,
+      priority: complaint.severity.priority || 'medium',
+      factors: complaint.severity.factors || {},
+    } : { score: 50, priority: 'medium', factors: {} },
+    location: complaint.location ? {
+      coordinates: complaint.location.coordinates || [],
+      address: complaint.location.address || '',
       area: complaint.location.area,
       ward: complaint.location.ward,
       pincode: complaint.location.pincode,
-    },
+    } : { coordinates: [], address: '' },
     // Hierarchy information
     hierarchy: {
       ucId: complaint.ucId,
@@ -648,7 +650,7 @@ const formatComplaintResponse = (complaint) => {
     sla: {
       deadline: complaint.slaDeadline,
       targetHours: complaint.slaHours,
-      breach: complaint.slaBreach,
+      breach: complaint.slaBreach || false,
     },
     citizenInfo: {
       name: complaint.citizenInfo?.name || 'Anonymous',
@@ -658,7 +660,7 @@ const formatComplaintResponse = (complaint) => {
     images: complaint.images?.map((img) => ({
       url: img.url,
     })) || [],
-    source: complaint.source,
+    source: complaint.source || 'web',
     assignedTo: complaint.assignedTo,
     resolution: complaint.resolution,
     duplicateOf: complaint.duplicateOf,

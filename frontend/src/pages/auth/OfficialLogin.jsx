@@ -44,7 +44,7 @@ const OfficialLogin = () => {
   const { login, error: authError, clearError } = useAuth();
   const [selectedType, setSelectedType] = useState(null);
   const [formData, setFormData] = useState({
-    employeeId: '',
+    email: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -67,9 +67,9 @@ const OfficialLogin = () => {
     setError('');
 
     try {
-      // Use employeeId as email for login
+      // Login with email and password
       const response = await login({
-        email: formData.employeeId,
+        email: formData.email,
         password: formData.password,
       });
 
@@ -150,10 +150,10 @@ const OfficialLogin = () => {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <InputField
-          label="Employee ID"
-          name="employeeId"
-          placeholder="Enter your employee ID"
-          value={formData.employeeId}
+          label="Email Address"
+          name="email"
+          placeholder="Enter your official email address"
+          value={formData.email}
           onChange={handleChange}
           required
           icon={
