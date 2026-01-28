@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts';
 
 const issueSeed = [
   {
@@ -27,6 +29,8 @@ const issueSeed = [
 const statusOptions = ['In review', 'In progress', 'Resolved'];
 
 const UCChairmanDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
   const [issues, setIssues] = useState(issueSeed);
   const [statusUpdates, setStatusUpdates] = useState({});
@@ -64,6 +68,11 @@ const UCChairmanDashboard = () => {
 
     setStatusMessage(`Status updated for ${issueId}.`);
     setTimeout(() => setStatusMessage(''), 2500);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/official/login');
   };
 
   return (
@@ -106,8 +115,17 @@ const UCChairmanDashboard = () => {
                 <p className="text-sm text-foreground/60">Welcome, UC Chairman</p>
                 <h2 className="text-2xl font-semibold">Union council operations</h2>
               </div>
-              <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
-                UC access
+              <div className="flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
+                  UC access
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-4 py-2 rounded-xl border border-foreground/20 text-foreground text-xs font-semibold hover:border-foreground/40 transition-all"
+                >
+                  Logout
+                </button>
               </div>
             </div>
 

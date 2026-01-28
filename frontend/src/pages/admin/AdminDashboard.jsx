@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts';
 
 const initialMayorForm = {
   fullName: '',
@@ -9,6 +11,8 @@ const initialMayorForm = {
 };
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('generate-mayor');
   const [formData, setFormData] = useState(initialMayorForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,6 +51,11 @@ const AdminDashboard = () => {
       });
       setFormData(initialMayorForm);
     }, 1200);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/sudo/admin');
   };
 
   return (
@@ -91,8 +100,17 @@ const AdminDashboard = () => {
                 <p className="text-sm text-foreground/60">Welcome back, Admin</p>
                 <h2 className="text-2xl font-semibold">Generate mayor account</h2>
               </div>
-              <div className="px-4 py-2 rounded-full bg-secondary/15 text-secondary text-xs font-semibold">
-                Secure operations
+              <div className="flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full bg-secondary/15 text-secondary text-xs font-semibold">
+                  Secure operations
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-4 py-2 rounded-xl border border-foreground/20 text-foreground text-xs font-semibold hover:border-foreground/40 transition-all"
+                >
+                  Logout
+                </button>
               </div>
             </div>
 

@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts';
 
 const issueSeed = [
   {
@@ -44,6 +46,8 @@ const feedbackSeed = [
 ];
 
 const MayorDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
   const [issues, setIssues] = useState(issueSeed);
   const [townshipForm, setTownshipForm] = useState({
@@ -111,6 +115,11 @@ const MayorDashboard = () => {
     setTimeout(() => setChairmanSuccess(false), 3000);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/official/login');
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex">
@@ -151,8 +160,17 @@ const MayorDashboard = () => {
                 <p className="text-sm text-foreground/60">Good morning, Mayor</p>
                 <h2 className="text-2xl font-semibold">City operations overview</h2>
               </div>
-              <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
-                Leadership access
+              <div className="flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
+                  Leadership access
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-4 py-2 rounded-xl border border-foreground/20 text-foreground text-xs font-semibold hover:border-foreground/40 transition-all"
+                >
+                  Logout
+                </button>
               </div>
             </div>
 

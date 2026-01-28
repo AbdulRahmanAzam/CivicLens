@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts';
 
 const issueSeed = [
   {
@@ -44,6 +46,8 @@ const feedbackSeed = [
 ];
 
 const TownshipDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
   const [issues] = useState(issueSeed);
   const [chairmanForm, setChairmanForm] = useState({
@@ -87,6 +91,11 @@ const TownshipDashboard = () => {
     setTimeout(() => setChairmanSuccess(false), 3000);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/official/login');
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex">
@@ -127,8 +136,17 @@ const TownshipDashboard = () => {
                 <p className="text-sm text-foreground/60">Welcome, Township Head</p>
                 <h2 className="text-2xl font-semibold">Township operations</h2>
               </div>
-              <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
-                Township access
+              <div className="flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
+                  Township access
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-4 py-2 rounded-xl border border-foreground/20 text-foreground text-xs font-semibold hover:border-foreground/40 transition-all"
+                >
+                  Logout
+                </button>
               </div>
             </div>
 
