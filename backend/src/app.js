@@ -21,10 +21,18 @@ app.use(helmet());
 
 // CORS configuration - support multiple origins for development
 const allowedOrigins = env.corsOrigin.split(',').map(origin => origin.trim());
+const allowAllOrigins = allowedOrigins.includes('*');
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or Postman)
     if (!origin) return callback(null, true);
+    
+    // If wildcard is set, allow all origins
+    if (allowAllOrigins) {
+      return callback(null, true);
+    }
+    
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }

@@ -8,6 +8,16 @@ class GeoService {
   constructor() {
     this.apiKey = env.googleMapsApiKey;
     this.baseUrl = 'https://maps.googleapis.com/maps/api/geocode/json';
+    
+    // Check if API key is valid (not placeholder)
+    this.hasValidApiKey = this.apiKey && 
+      !this.apiKey.includes('your_') && 
+      !this.apiKey.includes('YOUR_') &&
+      this.apiKey.length > 20;
+      
+    if (!this.hasValidApiKey) {
+      console.warn('⚠️ Google Maps API key not configured or is placeholder. Using Nominatim fallback.');
+    }
   }
 
   /**
@@ -17,10 +27,9 @@ class GeoService {
    * @returns {Object} - Location details
    */
   async reverseGeocode(latitude, longitude) {
-    // If no API key is configured, return placeholder data
-    if (!this.apiKey) {
-      console.warn('Google Maps API key not configured. Using placeholder location data.');
-      return this.getPlaceholderLocation(latitude, longitude);
+    // Try Nominatim (free, no API key needed) first if no valid Google key
+    if (!this.hasValidApiKey) {
+      return this.reverseGeocodeNominatim(latitude, longitude);
     }
 
     try {
@@ -32,12 +41,86 @@ class GeoService {
         return this.parseGeocodingResult(data.results[0], latitude, longitude);
       }
 
-      // Fallback to placeholder if geocoding fails
-      console.warn('Geocoding returned no results. Using placeholder data.');
+      // Fallback to Nominatim if Google fails
+      console.warn('Google geocoding failed. Using Nominatim fallback.');
+      return this.reverseGeocodeNominatim(latitude, longitude);
+    } catch (error) {
+      console.error('Google geocoding error:', error.message);
+      return this.reverseGeocodeNominatim(latitude, longitude);
+    }
+  }
+
+  /**
+   * Reverse geocode using Nominatim (OpenStreetMap) - FREE, no API key needed
+   */
+  async reverseGeocodeNominatim(latitude, longitude) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'CivicLens/1.0 (civic complaint system)',
+          'Accept-Language': 'en'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Nominatim returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.address) {
+        return {
+          type: 'Point',
+          coordinates: [longitude, latitude],
+          address: data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          area: data.address.suburb || data.address.neighbourhood || data.address.district || data.address.city_district || '',
+          ward: data.address.quarter || '',
+          pincode: data.address.postcode || '',
+          city: data.address.city || data.address.town || data.address.municipality || 'Karachi',
+        };
+      }
+      
       return this.getPlaceholderLocation(latitude, longitude);
     } catch (error) {
-      console.error('Geocoding error:', error.message);
+      console.error('Nominatim geocoding error:', error.message);
       return this.getPlaceholderLocation(latitude, longitude);
+    }
+  }
+
+  /**
+   * Forward geocode address to coordinates using Nominatim
+   */
+  async geocode(address) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&addressdetails=1`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'CivicLens/1.0 (civic complaint system)',
+          'Accept-Language': 'en'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Nominatim returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        return {
+          latitude: parseFloat(result.lat),
+          longitude: parseFloat(result.lon),
+          address: result.display_name,
+          area: result.address?.suburb || result.address?.neighbourhood || '',
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Geocoding error:', error.message);
+      return null;
     }
   }
 
