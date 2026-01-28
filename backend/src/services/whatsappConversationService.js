@@ -11,6 +11,7 @@ const complaintService = require('./complaintService');
 const classificationService = require('./classificationService');
 const cloudinaryService = require('./cloudinaryService');
 const geoService = require('./geoService');
+const { WhatsAppUser } = require('../models');
 
 // Message templates
 const MESSAGES = {
@@ -200,8 +201,20 @@ class WhatsAppConversationService {
       // Show typing indicator
       await whatsappService.sendTyping(phone);
 
+      // Get or create WhatsApp user profile
+      const whatsappUser = await WhatsAppUser.findOrCreate(phone, pushName);
+      
+      // Check if user is blocked
+      if (whatsappUser.isBlocked) {
+        await this.sendMessage(phone, '❌ Your account has been blocked. Please contact support.');
+        return;
+      }
+
       // Get or create session
       const session = await sessionService.getOrCreateSession(phone, { pushName });
+      
+      // Attach whatsappUser to session for complaint linking
+      session.whatsappUserId = whatsappUser._id;
 
       // Log incoming message (sanitize type for unknown messages)
       const messageType = ['text', 'audio', 'image', 'location', 'button', 'list'].includes(type) ? type : 'text';
@@ -224,6 +237,11 @@ class WhatsAppConversationService {
 
       if (textContent === 'help' || textContent === '?') {
         await this.sendMessage(phone, this.getMessage('help'));
+        return;
+      }
+
+      if (textContent === 'status' || textContent === 'mycomplaints' || textContent === 'history') {
+        await this.handleStatusCommand(phone);
         return;
       }
 
@@ -544,16 +562,20 @@ class WhatsAppConversationService {
       const freshSession = await sessionService.getSession(phone);
       const data = freshSession.data;
 
+      // Get WhatsApp user
+      const whatsappUser = await WhatsAppUser.findOne({ phone });
+
       // Prepare complaint data
       const complaintData = {
         description: data.description,
         phone: phone,
-        name: freshSession.userInfo?.pushName || 'WhatsApp User',
+        name: freshSession.userInfo?.pushName || whatsappUser?.displayName || 'WhatsApp User',
         latitude: data.location?.latitude || 0,
         longitude: data.location?.longitude || 0,
         address: data.location?.address || '',
         source: 'whatsapp',
         voiceMetadata: data.voiceMetadata || null,
+        whatsappUserId: whatsappUser?._id, // Link to WhatsApp user
       };
 
       // Prepare images
@@ -561,6 +583,23 @@ class WhatsAppConversationService {
 
       // Create complaint
       const result = await complaintService.createComplaint(complaintData, images);
+
+      // Link complaint to WhatsApp user
+      if (whatsappUser) {
+        await whatsappUser.addComplaint(result.complaint._id);
+        
+        // Update location if available
+        if (data.location?.latitude && data.location?.longitude) {
+          await whatsappUser.updateLocation({
+            latitude: data.location.latitude,
+            longitude: data.location.longitude,
+            address: data.location.address,
+            ucId: result.complaint.ucId,
+            townId: result.complaint.townId,
+            cityId: result.complaint.cityId,
+          });
+        }
+      }
 
       // Mark session complete
       await sessionService.completeSession(phone, result.complaint.complaintId);
@@ -592,6 +631,58 @@ class WhatsAppConversationService {
   async handleCancel(phone) {
     await sessionService.cancelSession(phone);
     await this.sendMessage(phone, this.getMessage('cancelled'));
+  }
+
+  /**
+   * Handle status command - show user's complaints
+   */
+  async handleStatusCommand(phone) {
+    try {
+      const whatsappUser = await WhatsAppUser.findOne({ phone })
+        .populate({
+          path: 'complaints',
+          select: 'complaintId status category.primary createdAt',
+          options: { sort: { createdAt: -1 }, limit: 5 },
+        });
+
+      if (!whatsappUser || whatsappUser.complaints.length === 0) {
+        await this.sendMessage(phone, '📋 You haven\'t submitted any complaints yet.\n\nSend a message to report an issue!');
+        return;
+      }
+
+      let statusMessage = `📋 *Your Recent Complaints*\n\n`;
+      statusMessage += `Total: ${whatsappUser.stats.totalComplaints} | Pending: ${whatsappUser.stats.pendingComplaints} | Resolved: ${whatsappUser.stats.resolvedComplaints}\n\n`;
+
+      for (const complaint of whatsappUser.complaints) {
+        const statusEmoji = this.getStatusEmoji(complaint.status);
+        const date = new Date(complaint.createdAt).toLocaleDateString();
+        statusMessage += `${statusEmoji} *${complaint.complaintId}*\n`;
+        statusMessage += `   📂 ${complaint.category?.primary || 'Others'}\n`;
+        statusMessage += `   📅 ${date} • ${complaint.status}\n\n`;
+      }
+
+      statusMessage += `To check specific complaint, reply with the complaint ID.`;
+
+      await this.sendMessage(phone, statusMessage);
+    } catch (error) {
+      console.error('Status command error:', error);
+      await this.sendMessage(phone, '❌ Could not fetch your complaints. Please try again.');
+    }
+  }
+
+  /**
+   * Get status emoji
+   */
+  getStatusEmoji(status) {
+    const emojis = {
+      pending: '🟡',
+      acknowledged: '🔵',
+      in_progress: '🟠',
+      resolved: '🟢',
+      closed: '✅',
+      rejected: '🔴',
+    };
+    return emojis[status] || '⚪';
   }
 
   /**

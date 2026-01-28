@@ -194,22 +194,26 @@ class InvitationService {
       password: userData.password,
       role: invitation.role,
       invitedBy: invitation.invitedBy,
-      invitationToken: hashedToken,
-      invitationAcceptedAt: new Date(),
+      invitationId: invitation._id,
+      isVerified: true, // Invitation-based registrations are pre-verified
     };
 
-    // Add NIC for chairman roles
+    // Add NIC for chairman roles - use nic.encrypted field structure
     if (['uc_chairman', 'town_chairman', 'mayor'].includes(invitation.role)) {
       if (!userData.nic) {
         throw new Error('NIC is required for administrative roles');
       }
-      newUserData.nicEncrypted = userData.nic; // Will be encrypted by pre-save hook
+      // Store NIC in proper format - the pre-save hook will encrypt it
+      newUserData.nic = {
+        encrypted: userData.nic, // Will be encrypted by pre-save hook
+        lastFour: userData.nic.slice(-4),
+      };
     }
 
-    // Add entity references
-    if (invitation.targetUC) newUserData.uc = invitation.targetUC;
-    if (invitation.targetTown) newUserData.town = invitation.targetTown;
-    if (invitation.targetCity) newUserData.city = invitation.targetCity;
+    // Add entity references using correct field names (ucId, townId, cityId)
+    if (invitation.targetUC) newUserData.ucId = invitation.targetUC;
+    if (invitation.targetTown) newUserData.townId = invitation.targetTown;
+    if (invitation.targetCity) newUserData.cityId = invitation.targetCity;
 
     // Create user
     const user = await User.create(newUserData);

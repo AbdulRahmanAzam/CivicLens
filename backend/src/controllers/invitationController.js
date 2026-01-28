@@ -135,23 +135,19 @@ exports.acceptInvitation = asyncHandler(async (req, res, next) => {
       }
     );
 
-    // Generate tokens for the new user
+    // Generate tokens for the new user using authService
+    const authService = require('../services/authService');
     const { User } = require('../models');
     const user = await User.findById(result.user.id);
-    const accessToken = user.getSignedJwtToken();
-    const refreshToken = user.getRefreshToken();
-
-    // Save refresh token
-    user.refreshToken = refreshToken;
-    await user.save();
+    const tokens = await authService.generateTokenPair(user);
 
     res.status(201).json({
       success: true,
       message: 'Registration successful',
       data: {
         user: result.user,
-        accessToken,
-        refreshToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       },
     });
   } catch (error) {

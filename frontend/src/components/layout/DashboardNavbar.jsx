@@ -52,24 +52,33 @@ const DashboardNavbar = ({ title }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const userMenuRef = useRef(null);
+  const notificationRef = useRef(null);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { 
     toggleMobileMenu, 
     unreadCount,
-    toggleNotifications 
+    notifications,
+    notificationsOpen,
+    toggleNotifications,
+    closeNotifications,
+    markAsRead,
+    markAllAsRead,
   } = useUiStore();
 
-  // Close user menu on outside click
+  // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setUserMenuOpen(false);
       }
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        closeNotifications();
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [closeNotifications]);
 
   const handleLogout = async () => {
     try {
@@ -151,17 +160,89 @@ const DashboardNavbar = ({ title }) => {
         {/* Right: Notifications + User Menu */}
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <button
-            onClick={toggleNotifications}
-            className="relative p-2 text-foreground/70 hover:bg-foreground/5 rounded-lg transition-colors"
-          >
-            <Icons.Bell />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={toggleNotifications}
+              className="relative p-2 text-foreground/70 hover:bg-foreground/5 rounded-lg transition-colors"
+            >
+              <Icons.Bell />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notifications Panel */}
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-lg border border-foreground/10 z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-foreground/10 flex items-center justify-between bg-gradient-to-r from-primary/5 to-transparent">
+                  <h3 className="font-semibold text-foreground">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={markAllAsRead}
+                      className="text-xs text-primary hover:text-primary/80 font-medium"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-foreground/5 flex items-center justify-center">
+                        <Icons.Bell />
+                      </div>
+                      <p className="text-sm text-foreground/50">No notifications yet</p>
+                      <p className="text-xs text-foreground/40 mt-1">We'll notify you about important updates</p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 10).map((notification) => (
+                      <div 
+                        key={notification.id}
+                        onClick={() => markAsRead(notification.id)}
+                        className={`px-4 py-3 border-b border-foreground/5 hover:bg-foreground/5 cursor-pointer transition-colors ${
+                          !notification.read ? 'bg-primary/5' : ''
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${
+                            !notification.read ? 'bg-primary' : 'bg-transparent'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm ${!notification.read ? 'font-medium text-foreground' : 'text-foreground/70'}`}>
+                              {notification.title || notification.message}
+                            </p>
+                            {notification.description && (
+                              <p className="text-xs text-foreground/50 mt-0.5 line-clamp-2">
+                                {notification.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-foreground/40 mt-1">
+                              {notification.time || 'Just now'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {notifications.length > 0 && (
+                  <div className="px-4 py-2 border-t border-foreground/10 bg-foreground/5">
+                    <Link 
+                      to={`${getProfileLink().replace('/profile', '/notifications')}`}
+                      onClick={closeNotifications}
+                      className="block text-center text-sm text-primary hover:text-primary/80 font-medium"
+                    >
+                      View all notifications
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
-          </button>
+          </div>
 
           {/* User Menu */}
           <div className="relative" ref={userMenuRef}>
