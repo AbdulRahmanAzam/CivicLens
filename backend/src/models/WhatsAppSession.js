@@ -77,7 +77,7 @@ const WhatsAppSessionSchema = new mongoose.Schema(
       },
       type: {
         type: String,
-        enum: ['text', 'audio', 'image', 'location', 'button', 'list', 'unknown'],
+        enum: ['text', 'audio', 'image', 'location', 'button', 'list', 'location_request', 'unknown'],
       },
       content: String,
       timestamp: { type: Date, default: Date.now },

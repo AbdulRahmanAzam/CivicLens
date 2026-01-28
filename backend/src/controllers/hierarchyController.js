@@ -103,8 +103,8 @@ exports.getCity = asyncHandler(async (req, res, next) => {
 
   if (includeTowns === 'true') {
     result.towns = await Town.find({ city: city._id, isActive: true })
-      .populate('townChairman', 'name email')
-      .select('name code population townChairman');
+      .populate('chairman', 'name email')
+      .select('name code population chairman');
   }
 
   if (includeStats === 'true') {
@@ -273,38 +273,44 @@ exports.getTowns = asyncHandler(async (req, res, next) => {
   const { cityId } = req.params;
   const { includeStats, includeInactive } = req.query;
 
-  const query = {};
-  
-  // If cityId is provided, filter by city
-  if (cityId) {
-    query.city = cityId;
-  }
-  
-  if (includeInactive !== 'true') {
-    query.isActive = true;
-  }
+  try {
+    const query = {};
+    
+    // If cityId is provided, filter by city
+    if (cityId) {
+      query.city = cityId;
+    }
+    
+    if (includeInactive !== 'true') {
+      query.isActive = true;
+    }
 
-  let towns = await Town.find(query)
-    .populate('townChairman', 'name email')
-    .populate('city', 'name code')
-    .select('-boundary')
-    .sort({ name: 1 });
+    let towns = await Town.find(query)
+      .populate('chairman', 'name email')
+      .populate('city', 'name code')
+      .select('-boundary')
+      .sort({ name: 1 })
+      .lean(); // Use lean() for better performance
 
-  if (includeStats === 'true') {
-    towns = await Promise.all(towns.map(async (town) => {
-      const ucCount = await UC.countDocuments({ town: town._id, isActive: true });
-      return {
-        ...town.toObject(),
-        stats: { ucCount },
-      };
-    }));
+    if (includeStats === 'true') {
+      towns = await Promise.all(towns.map(async (town) => {
+        const ucCount = await UC.countDocuments({ town: town._id, isActive: true });
+        return {
+          ...town,
+          stats: { ucCount },
+        };
+      }));
+    }
+
+    res.status(200).json({
+      success: true,
+      count: towns.length,
+      data: towns,
+    });
+  } catch (error) {
+    console.error('Error in getTowns:', error);
+    return next(new ErrorResponse(`Error fetching towns: ${error.message}`, 500));
   }
-
-  res.status(200).json({
-    success: true,
-    count: towns.length,
-    data: towns,
-  });
 });
 
 /**
@@ -317,7 +323,7 @@ exports.getTown = asyncHandler(async (req, res, next) => {
   const { includeUCs, includeStats } = req.query;
 
   let town = await Town.findById(townId)
-    .populate('townChairman', 'name email')
+    .populate('chairman', 'name email')
     .populate('city', 'name code');
 
   if (!town) {
@@ -519,44 +525,50 @@ exports.getUCs = asyncHandler(async (req, res, next) => {
   const { townId } = req.params;
   const { includeStats, includeInactive } = req.query;
 
-  const query = {};
-  
-  // If townId is provided, filter by town
-  if (townId) {
-    query.town = townId;
-  }
-  
-  if (includeInactive !== 'true') {
-    query.isActive = true;
-  }
+  try {
+    const query = {};
+    
+    // If townId is provided, filter by town
+    if (townId) {
+      query.town = townId;
+    }
+    
+    if (includeInactive !== 'true') {
+      query.isActive = true;
+    }
 
-  let ucs = await UC.find(query)
-    .populate('chairman', 'name email')
-    .populate('town', 'name code')
-    .populate('city', 'name code')
-    .select('-boundary')
-    .sort({ ucNumber: 1 });
+    let ucs = await UC.find(query)
+      .populate('chairman', 'name email')
+      .populate('town', 'name code')
+      .populate('city', 'name code')
+      .select('-boundary')
+      .sort({ ucNumber: 1 })
+      .lean(); // Use lean() for better performance
 
-  if (includeStats === 'true') {
-    const { Complaint } = require('../models');
-    ucs = await Promise.all(ucs.map(async (uc) => {
-      const complaintCount = await Complaint.countDocuments({ ucId: uc._id });
-      const pendingCount = await Complaint.countDocuments({ 
-        ucId: uc._id, 
-        status: { $in: ['submitted', 'acknowledged', 'in_progress'] }
-      });
-      return {
-        ...uc.toObject(),
-        stats: { complaintCount, pendingCount },
-      };
-    }));
+    if (includeStats === 'true') {
+      const { Complaint } = require('../models');
+      ucs = await Promise.all(ucs.map(async (uc) => {
+        const complaintCount = await Complaint.countDocuments({ ucId: uc._id });
+        const pendingCount = await Complaint.countDocuments({ 
+          ucId: uc._id, 
+          status: { $in: ['submitted', 'acknowledged', 'in_progress'] }
+        });
+        return {
+          ...uc,
+          stats: { complaintCount, pendingCount },
+        };
+      }));
+    }
+
+    res.status(200).json({
+      success: true,
+      count: ucs.length,
+      data: ucs,
+    });
+  } catch (error) {
+    console.error('Error in getUCs:', error);
+    return next(new ErrorResponse(`Error fetching UCs: ${error.message}`, 500));
   }
-
-  res.status(200).json({
-    success: true,
-    count: ucs.length,
-    data: ucs,
-  });
 });
 
 /**

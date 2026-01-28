@@ -11,6 +11,8 @@ const complaintService = require('./complaintService');
 const classificationService = require('./classificationService');
 const cloudinaryService = require('./cloudinaryService');
 const geoService = require('./geoService');
+const ragService = require('./ragService');
+const ttsService = require('./ttsService');
 const { WhatsAppUser } = require('../models');
 
 // Message templates
@@ -63,41 +65,60 @@ Send a photo or type "skip" to continue without one.`,
 फोटो भेजें या बिना फोटो के जारी रखने के लिए "skip" टाइप करें।`,
   },
 
-  confirm: (data) => ({
-    en: `📋 Please confirm your complaint:
+  confirm: (data) => {
+    const description = data.description || 'Not provided';
+    const shortDesc = description.length > 100 ? description.substring(0, 100) + '...' : description;
+    const locationText = data.location?.address || 
+      (data.location?.latitude ? `${data.location.latitude.toFixed(4)}, ${data.location.longitude.toFixed(4)}` : 'Not specified');
+    const imageCount = data.images?.length || 0;
+    const categoryText = data.category?.primary ? `📂 Category: ${data.category.primary} (${Math.round((data.category.confidence || 0) * 100)}% confidence)` : '';
+    
+    return {
+      en: `📋 *Please review your complaint:*
 
-📝 Description: ${data.description}
-📍 Location: ${data.location?.address || 'Not specified'}
-📸 Images: ${data.images?.length || 0} photo(s)
+📝 *Description:* ${shortDesc}
+📍 *Location:* ${locationText}
+📸 *Photos:* ${imageCount} attached
+${categoryText}
 
-Reply "yes" to submit or "no" to start over.`,
-    hi: `📋 कृपया अपनी शिकायत की पुष्टि करें:
+✅ Reply *yes* to submit
+❌ Reply *no* to cancel and start over`,
+      hi: `📋 *कृपया अपनी शिकायत की समीक्षा करें:*
 
-📝 विवरण: ${data.description}
-📍 स्थान: ${data.location?.address || 'निर्दिष्ट नहीं'}
-📸 फोटो: ${data.images?.length || 0} फोटो
+📝 *विवरण:* ${shortDesc}
+📍 *स्थान:* ${locationText}
+📸 *फोटो:* ${imageCount} संलग्न
+${categoryText}
 
-सबमिट करने के लिए "yes" या फिर से शुरू करने के लिए "no" टाइप करें।`,
-  }),
+✅ सबमिट करने के लिए *yes* लिखें
+❌ रद्द करने के लिए *no* लिखें`,
+    };
+  },
 
-  success: (complaintId, category) => ({
-    en: `✅ Complaint submitted successfully!
+  success: (data) => {
+    const { complaintId, category, slaHours } = data || {};
+    const slaText = slaHours ? `\n⏰ Expected resolution: ${slaHours} hours` : '';
+    return {
+      en: `🎉 *Complaint submitted successfully!*
 
-🎫 Complaint ID: ${complaintId}
-📂 Category: ${category}
+🎫 *Complaint ID:* ${complaintId}
+📂 *Category:* ${category}${slaText}
 
-You can track your complaint using this ID.
+📱 You'll receive updates on this number.
+💬 Send *status* anytime to check your complaints.
 
-To report another issue, just send a message anytime!`,
-    hi: `✅ शिकायत सफलतापूर्वक दर्ज हो गई!
+Thank you for helping improve your community! 🏙️`,
+      hi: `🎉 *शिकायत सफलतापूर्वक दर्ज!*
 
-🎫 शिकायत आईडी: ${complaintId}
-📂 श्रेणी: ${category}
+🎫 *शिकायत आईडी:* ${complaintId}
+📂 *श्रेणी:* ${category}${slaText}
 
-आप इस आईडी का उपयोग करके अपनी शिकायत को ट्रैक कर सकते हैं।
+📱 आपको इस नंबर पर अपडेट मिलेंगे।
+💬 स्थिति जानने के लिए कभी भी *status* भेजें।
 
-किसी अन्य समस्या की रिपोर्ट करने के लिए, कभी भी संदेश भेजें!`,
-  }),
+समुदाय को बेहतर बनाने में मदद के लिए धन्यवाद! 🏙️`,
+    };
+  },
 
   cancelled: {
     en: `❌ Complaint cancelled. 
@@ -199,28 +220,45 @@ class WhatsAppConversationService {
 
     try {
       // Show typing indicator
-      await whatsappService.sendTyping(phone);
+      try {
+        await whatsappService.sendTyping(phone);
+      } catch (e) {
+        // Typing indicator is optional
+      }
 
       // Get or create WhatsApp user profile
-      const whatsappUser = await WhatsAppUser.findOrCreate(phone, pushName);
-      
-      // Check if user is blocked
-      if (whatsappUser.isBlocked) {
-        await this.sendMessage(phone, '❌ Your account has been blocked. Please contact support.');
-        return;
+      let whatsappUser;
+      try {
+        whatsappUser = await WhatsAppUser.findOrCreate(phone, pushName);
+        
+        // Check if user is blocked
+        if (whatsappUser.isBlocked) {
+          await this.sendMessage(phone, '❌ Your account has been blocked. Please contact support.');
+          return;
+        }
+      } catch (e) {
+        console.error('Error getting WhatsApp user:', e.message);
+        // Continue without user profile
       }
 
       // Get or create session
       const session = await sessionService.getOrCreateSession(phone, { pushName });
       
       // Attach whatsappUser to session for complaint linking
-      session.whatsappUserId = whatsappUser._id;
+      if (whatsappUser) {
+        session.whatsappUserId = whatsappUser._id;
+      }
 
-      // Log incoming message (sanitize type for unknown messages)
-      const messageType = ['text', 'audio', 'image', 'location', 'button', 'list'].includes(type) ? type : 'text';
-      await sessionService.addMessage(phone, 'incoming', messageType, 
-        typeof content === 'string' ? content : JSON.stringify(content)
-      );
+      // Log incoming message (with safe defaults)
+      try {
+        const messageType = ['text', 'audio', 'image', 'location', 'button', 'list'].includes(type) ? type : 'text';
+        await sessionService.addMessage(phone, 'incoming', messageType, 
+          typeof content === 'string' ? content : JSON.stringify(content)
+        );
+      } catch (e) {
+        console.error('Error logging message:', e.message);
+        // Continue without logging
+      }
 
       // Handle special commands
       const textContent = type === 'text' ? content.toLowerCase().trim() : '';
@@ -243,6 +281,15 @@ class WhatsAppConversationService {
       if (textContent === 'status' || textContent === 'mycomplaints' || textContent === 'history') {
         await this.handleStatusCommand(phone);
         return;
+      }
+
+      // Check if this is an informational query (RAG-based response)
+      if (type === 'text' && session.step !== 'confirm') {
+        const isInfoQuery = await ragService.isInformationalQuery(content);
+        if (isInfoQuery) {
+          await this.handleInformationalQuery(phone, content, session);
+          return;
+        }
       }
 
       // Process based on current step
@@ -276,12 +323,28 @@ class WhatsAppConversationService {
           await this.handleRestart(phone, session);
       }
 
-      // Stop typing
-      await whatsappService.stopTyping(phone);
+      // Stop typing (ignore errors)
+      try {
+        await whatsappService.stopTyping(phone);
+      } catch (e) {
+        // Typing indicator is optional
+      }
 
     } catch (error) {
-      console.error('Conversation error:', error);
-      await this.sendMessage(phone, this.getMessage('error'));
+      console.error('❌ Conversation error for', phone, ':', error);
+      console.error('Error stack:', error.stack);
+      console.error('Message data:', JSON.stringify(messageData, null, 2));
+      
+      // Send more specific error message
+      const errorMsg = process.env.NODE_ENV === 'development' 
+        ? `❌ Error: ${error.message}\n\nSend "restart" to try again.`
+        : this.getMessage('error');
+      
+      try {
+        await this.sendMessage(phone, errorMsg);
+      } catch (sendError) {
+        console.error('Failed to send error message:', sendError);
+      }
     }
   }
 
@@ -376,33 +439,41 @@ class WhatsAppConversationService {
     
     // Optionally send web link for location sharing
     if (this.enableLocationWebLink) {
-      await this.sendLocationWebLink(phone);
+      try {
+        await this.sendLocationWebLink(phone);
+      } catch (error) {
+        console.error('Error sending location web link:', error);
+        // Continue without web link
+      }
     }
     
-    // Log the location request
-    await sessionService.addMessage(phone, 'outgoing', 'location_request', 'Location request sent');
+    // Log the location request (don't throw error if it fails)
+    try {
+      await sessionService.addMessage(phone, 'outgoing', 'location_request', 'Location request sent');
+    } catch (error) {
+      console.error('Error logging location request:', error);
+      // Continue without logging
+    }
   }
 
   /**
    * Send web link for location sharing (as backup method)
    */
   async sendLocationWebLink(phone) {
-    try {
-      const session = await sessionService.getSession(phone);
-      if (!session) return;
-
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const locationUrl = `${baseUrl}/share-location?phone=${encodeURIComponent(phone)}&session=${session._id}`;
-
-      // Send link with clear instructions
-      await this.sendMessage(
-        phone,
-        `\n🔗 Or click this link to share location from your browser:\n${locationUrl}`
-      );
-    } catch (error) {
-      console.error('Error sending location web link:', error);
-      // Don't fail the whole flow if web link fails
+    const session = await sessionService.getSession(phone);
+    if (!session) {
+      console.log('Session not found for web link, skipping');
+      return;
     }
+
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const locationUrl = `${baseUrl}/share-location?phone=${encodeURIComponent(phone)}&session=${session._id}`;
+
+    // Send link with clear instructions
+    await this.sendMessage(
+      phone,
+      `\n🔗 Or click this link to share location from your browser:\n${locationUrl}`
+    );
   }
 
   /**
@@ -604,10 +675,17 @@ class WhatsAppConversationService {
       // Mark session complete
       await sessionService.completeSession(phone, result.complaint.complaintId);
 
+      // Get SLA hours for the category
+      const categoryInfo = ragService.knowledgeBase?.categories?.find(
+        c => c.name.toLowerCase() === result.complaint.category.primary.toLowerCase()
+      );
+      const slaHours = categoryInfo?.slaHours || 72;
+
       // Send success message
       await this.sendMessage(phone, this.getMessage('success', 'en', {
         complaintId: result.complaint.complaintId,
         category: result.complaint.category.primary,
+        slaHours: slaHours,
       }));
 
     } catch (error) {
@@ -671,6 +749,52 @@ class WhatsAppConversationService {
   }
 
   /**
+   * Handle informational queries using RAG
+   */
+  async handleInformationalQuery(phone, query, session) {
+    try {
+      // Check for quick answers first
+      const quickAnswer = ragService.getQuickAnswer(query);
+      if (quickAnswer) {
+        await this.sendMessage(phone, quickAnswer);
+        return;
+      }
+
+      // Get conversation history for context
+      const sessionMessages = session.messages?.slice(-5) || [];
+      const conversationHistory = sessionMessages.map(m => ({
+        role: m.direction === 'incoming' ? 'user' : 'assistant',
+        content: m.content,
+      }));
+
+      // Generate RAG response
+      const response = await ragService.generateResponse(query, conversationHistory);
+
+      // Send text response
+      await this.sendMessage(phone, response);
+
+      // Optionally try TTS for short responses
+      if (ttsService.shouldUseTTS(response)) {
+        const ttsResult = await ttsService.textToSpeech(response);
+        if (ttsResult.success && ttsResult.audioPath) {
+          // TTS is available, could send audio
+          // await whatsappService.sendAudio(phone, ttsResult.audioPath);
+        }
+      }
+
+      // Add a prompt to continue with complaint if needed
+      if (session.step === 'greeting') {
+        await this.sendMessage(phone, '\n💡 *Want to report an issue?* Just describe your complaint and I\'ll help you submit it.');
+      }
+
+    } catch (error) {
+      console.error('RAG query error:', error);
+      // Fallback to standard complaint flow
+      await this.sendMessage(phone, '❌ I couldn\'t process that question. If you want to report an issue, please describe it and I\'ll help you submit a complaint.');
+    }
+  }
+
+  /**
    * Get status emoji
    */
   getStatusEmoji(status) {
@@ -686,11 +810,23 @@ class WhatsAppConversationService {
   }
 
   /**
-   * Send message helper
+   * Send message helper with error handling
    */
   async sendMessage(phone, text) {
-    await whatsappService.sendText(phone, text);
-    await sessionService.addMessage(phone, 'outgoing', 'text', text);
+    try {
+      await whatsappService.sendText(phone, text);
+    } catch (e) {
+      console.error('Error sending message:', e.message);
+      throw e; // Re-throw to let caller handle
+    }
+    
+    // Log outgoing message (don't fail if logging fails)
+    try {
+      await sessionService.addMessage(phone, 'outgoing', 'text', text);
+    } catch (e) {
+      console.error('Error logging outgoing message:', e.message);
+      // Continue without logging
+    }
   }
 
   /**

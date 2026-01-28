@@ -6,6 +6,7 @@
 
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
+const ffprobeStatic = require('ffprobe-static');
 const fs = require('fs').promises;
 const path = require('path');
 const { createWriteStream, createReadStream } = require('fs');
@@ -13,8 +14,9 @@ const os = require('os');
 const crypto = require('crypto');
 const axios = require('axios');
 
-// Set ffmpeg path
+// Set ffmpeg and ffprobe paths
 ffmpeg.setFfmpegPath(ffmpegStatic);
+ffmpeg.setFfprobePath(ffprobeStatic.path);
 
 // Configuration
 const AUDIO_CONFIG = {

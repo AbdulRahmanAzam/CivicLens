@@ -1,0 +1,330 @@
+{
+  "system": {
+    "name": "CivicLens",
+    "version": "1.0.0",
+    "description": "CivicLens is a comprehensive citizen complaint management system designed for efficient civic grievance handling. It enables citizens to report issues via web, mobile app, or WhatsApp, with AI-powered classification, geo-based routing, and real-time tracking.",
+    "whatsappNumber": "+92 318 3610230",
+    "website": "https://civiclens.abdulrahmanazam.me",
+    "api": "https://civiclensbackend.abdulrahmanazam.me"
+  },
+  "features": [
+    {
+      "name": "Multi-Channel Complaint Submission",
+      "description": "Citizens can submit complaints through web app, mobile app, WhatsApp bot, or voice messages"
+    },
+    {
+      "name": "AI-Powered Classification",
+      "description": "Complaints are automatically categorized using GROQ AI into categories like Roads, Water, Garbage, Electricity, Sanitation, and Others"
+    },
+    {
+      "name": "Geo-Based Routing",
+      "description": "Complaints are automatically routed to the correct Union Council (UC) based on GPS location"
+    },
+    {
+      "name": "Real-Time Tracking",
+      "description": "Citizens can track complaint status from submission to resolution with SMS/WhatsApp notifications"
+    },
+    {
+      "name": "Voice Complaints",
+      "description": "Submit complaints via voice messages in English, Hindi, or Urdu - automatically transcribed"
+    },
+    {
+      "name": "Image Evidence",
+      "description": "Attach up to 5 photos as evidence of civic issues"
+    },
+    {
+      "name": "SLA Monitoring",
+      "description": "Service Level Agreement tracking with automatic escalation on breach"
+    },
+    {
+      "name": "Analytics Dashboard",
+      "description": "Real-time dashboards for UC Chairmen, Town Chairmen, and Mayors to monitor complaints"
+    }
+  ],
+  "categories": [
+    {
+      "name": "Roads",
+      "description": "Road conditions, potholes, traffic signals, street lights, road markings",
+      "slaHours": 72,
+      "keywords": ["pothole", "road damage", "street light", "traffic signal", "road repair", "crack", "broken road"]
+    },
+    {
+      "name": "Water",
+      "description": "Water supply issues, leakages, drainage, sewerage problems",
+      "slaHours": 48,
+      "keywords": ["water supply", "leakage", "no water", "dirty water", "sewerage", "drainage", "pipeline", "water tanker"]
+    },
+    {
+      "name": "Garbage",
+      "description": "Waste collection, cleanliness, garbage disposal, littering",
+      "slaHours": 24,
+      "keywords": ["garbage", "trash", "waste", "cleanliness", "littering", "dump", "sanitation workers"]
+    },
+    {
+      "name": "Electricity",
+      "description": "Power outages, meter issues, billing, electric hazards",
+      "slaHours": 24,
+      "keywords": ["load shedding", "power cut", "electric", "meter", "transformer", "wire", "billing"]
+    },
+    {
+      "name": "Sanitation",
+      "description": "Public toilets, hygiene facilities, pest control",
+      "slaHours": 48,
+      "keywords": ["toilet", "hygiene", "pest", "mosquito", "rat", "public washroom", "cleanliness"]
+    },
+    {
+      "name": "Others",
+      "description": "Other civic issues not covered above",
+      "slaHours": 96,
+      "keywords": ["other", "miscellaneous", "general"]
+    }
+  ],
+  "complaintStatus": [
+    {
+      "status": "submitted",
+      "description": "Complaint has been received and is pending review"
+    },
+    {
+      "status": "acknowledged",
+      "description": "Complaint has been acknowledged by the UC Chairman"
+    },
+    {
+      "status": "in_progress",
+      "description": "Work is being done to resolve the issue"
+    },
+    {
+      "status": "resolved",
+      "description": "Issue has been resolved, pending citizen confirmation"
+    },
+    {
+      "status": "closed",
+      "description": "Complaint is closed after resolution confirmation"
+    },
+    {
+      "status": "rejected",
+      "description": "Complaint was rejected (duplicate, invalid, or out of jurisdiction)"
+    }
+  ],
+  "hierarchy": {
+    "structure": "City → Town → Union Council (UC)",
+    "description": "Pakistan's local government follows a hierarchical structure. CivicLens routes complaints to the smallest administrative unit - the Union Council (UC).",
+    "roles": [
+      {
+        "role": "Mayor",
+        "description": "Head of the city, oversees all towns. Can view city-wide analytics and appoint Town Chairmen."
+      },
+      {
+        "role": "Town Chairman",
+        "description": "Head of a town, manages multiple UCs. Can assign UC Chairmen and view town analytics."
+      },
+      {
+        "role": "UC Chairman",
+        "description": "Head of a Union Council, manages citizen complaints. Assigns complaints to officers and verifies resolutions."
+      },
+      {
+        "role": "Officer",
+        "description": "Field officer assigned to specific departments. Resolves complaints and reports back."
+      }
+    ]
+  },
+  "karachi": {
+    "city": {
+      "name": "Karachi",
+      "province": "Sindh",
+      "population": "16 million+",
+      "mayor": {
+        "name": "Barrister Murtaza Wahab",
+        "party": "PPP (Pakistan Peoples Party)",
+        "since": "2021",
+        "contact": "Mayor House, Karachi",
+        "responsibilities": "Overall city administration, development projects, municipal services"
+      }
+    },
+    "towns": [
+      {
+        "name": "Korangi",
+        "code": "KRG",
+        "townChairman": "Currently under Administrator",
+        "population": "2.5 million",
+        "ucs": 36,
+        "areas": ["Korangi", "Landhi", "Shah Faisal Colony", "Model Colony"]
+      },
+      {
+        "name": "Malir",
+        "code": "MLR",
+        "townChairman": "Currently under Administrator",
+        "population": "2 million",
+        "ucs": 26,
+        "areas": ["Malir City", "Model Colony", "Quaidabad", "Airport"]
+      },
+      {
+        "name": "East (Jamshed Town)",
+        "code": "EAST",
+        "townChairman": "Currently under Administrator",
+        "population": "2.5 million",
+        "ucs": 33,
+        "areas": ["PECHS", "Gulshan-e-Iqbal", "Jamshed Quarters", "Bahadurabad"]
+      },
+      {
+        "name": "South",
+        "code": "SOUTH",
+        "townChairman": "Currently under Administrator",
+        "population": "1.8 million",
+        "ucs": 18,
+        "areas": ["Saddar", "Garden", "Lyari", "Clifton"]
+      },
+      {
+        "name": "West (Orangi Town)",
+        "code": "WEST",
+        "townChairman": "Currently under Administrator",
+        "population": "3 million",
+        "ucs": 45,
+        "areas": ["Orangi", "SITE Town", "Baldia", "Manghopir"]
+      },
+      {
+        "name": "Central",
+        "code": "CEN",
+        "townChairman": "Currently under Administrator",
+        "population": "2.8 million",
+        "ucs": 40,
+        "areas": ["North Nazimabad", "Nazimabad", "Liaquatabad", "Federal B Area"]
+      },
+      {
+        "name": "Kemari",
+        "code": "KMR",
+        "townChairman": "Currently under Administrator",
+        "population": "1.5 million",
+        "ucs": 16,
+        "areas": ["Kemari Port", "Hawkes Bay", "Mauaach Goth"]
+      }
+    ],
+    "departments": [
+      {
+        "name": "KMC (Karachi Metropolitan Corporation)",
+        "head": "Administrator Barrister Murtaza Wahab",
+        "responsibilities": "Roads, drainage, parks, solid waste management"
+      },
+      {
+        "name": "KWSB (Karachi Water & Sewerage Board)",
+        "responsibilities": "Water supply, sewerage, drainage"
+      },
+      {
+        "name": "K-Electric",
+        "responsibilities": "Electricity supply to Karachi"
+      },
+      {
+        "name": "SSWMB (Sindh Solid Waste Management Board)",
+        "responsibilities": "Garbage collection and disposal"
+      },
+      {
+        "name": "DMC (District Municipal Corporation)",
+        "responsibilities": "Local area development, sanitation"
+      }
+    ],
+    "helplines": [
+      {
+        "name": "KMC Complaint Helpline",
+        "number": "1339"
+      },
+      {
+        "name": "K-Electric Helpline",
+        "number": "118"
+      },
+      {
+        "name": "KWSB Complaint",
+        "number": "1334"
+      },
+      {
+        "name": "Edhi Foundation",
+        "number": "115"
+      },
+      {
+        "name": "Police Emergency",
+        "number": "15"
+      }
+    ]
+  },
+  "howToUse": {
+    "whatsapp": [
+      "Save number +92 318 3610230 in your contacts",
+      "Send 'Hi' to start a conversation",
+      "Describe your complaint (text or voice)",
+      "Share your location when prompted",
+      "Optionally attach photos",
+      "Confirm to submit",
+      "Receive complaint ID for tracking"
+    ],
+    "web": [
+      "Visit the CivicLens website",
+      "Click 'Report Issue' button",
+      "Fill in the complaint form",
+      "Allow location access or pin on map",
+      "Upload photos if needed",
+      "Submit and receive tracking ID"
+    ],
+    "tracking": [
+      "Use your Complaint ID (format: CL-YYYYMMDD-XXXXX)",
+      "Send 'status' on WhatsApp to see your complaints",
+      "Or visit the website and enter your complaint ID",
+      "Status updates: Submitted → Acknowledged → In Progress → Resolved → Closed"
+    ]
+  },
+  "faq": [
+    {
+      "question": "How do I report a complaint?",
+      "answer": "You can report via WhatsApp by messaging +92 318 3610230, through our website, or mobile app. Simply describe your issue, share location, and optionally add photos."
+    },
+    {
+      "question": "How long does it take to resolve a complaint?",
+      "answer": "Resolution time depends on the category: Garbage (24 hours), Water/Sanitation (48 hours), Roads (72 hours), Others (96 hours). Complex issues may take longer."
+    },
+    {
+      "question": "Can I track my complaint?",
+      "answer": "Yes! Use your Complaint ID to track status. On WhatsApp, send 'status' to see your recent complaints. You'll also receive SMS/WhatsApp notifications on status changes."
+    },
+    {
+      "question": "What if my complaint is rejected?",
+      "answer": "Complaints may be rejected if they're duplicates, outside jurisdiction, or lack required information. You can submit a new complaint with more details."
+    },
+    {
+      "question": "Is this service free?",
+      "answer": "Yes, CivicLens is completely free for citizens. It's a public service initiative to improve civic governance."
+    },
+    {
+      "question": "What areas does CivicLens cover?",
+      "answer": "Currently, CivicLens operates in Karachi, covering all 7 districts and their Union Councils. We're expanding to other cities soon."
+    },
+    {
+      "question": "Can I submit a complaint anonymously?",
+      "answer": "Your phone number is required for tracking, but your personal information is kept confidential and not shared publicly."
+    },
+    {
+      "question": "Who handles my complaint?",
+      "answer": "Complaints are routed to the UC Chairman of your area, who assigns them to relevant department officers."
+    }
+  ],
+  "commands": {
+    "whatsapp": [
+      {
+        "command": "hi / hello / start",
+        "description": "Start a new complaint submission"
+      },
+      {
+        "command": "status / mycomplaints / history",
+        "description": "View your recent complaints and their status"
+      },
+      {
+        "command": "help / ?",
+        "description": "Show available commands and help information"
+      },
+      {
+        "command": "restart / new",
+        "description": "Start a new complaint from scratch"
+      },
+      {
+        "command": "cancel / exit",
+        "description": "Cancel current complaint submission"
+      }
+    ]
+  }
+}
