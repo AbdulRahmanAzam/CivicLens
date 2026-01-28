@@ -617,6 +617,8 @@ const getMyComplaints = asyncHandler(async (req, res) => {
  * Format complaint for API response
  */
 const formatComplaintResponse = (complaint) => {
+  if (!complaint) return null;
+  
   return {
     id: complaint._id,
     complaintId: complaint.complaintId,
@@ -656,7 +658,7 @@ const formatComplaintResponse = (complaint) => {
     sla: {
       deadline: complaint.slaDeadline,
       targetHours: complaint.slaHours,
-      breach: complaint.slaBreach,
+      breach: complaint.slaBreach || false,
     },
     citizenInfo: {
       name: complaint.citizenInfo?.name || 'Anonymous',
@@ -666,7 +668,7 @@ const formatComplaintResponse = (complaint) => {
     images: complaint.images?.map((img) => ({
       url: img.url,
     })) || [],
-    source: complaint.source,
+    source: complaint.source || 'web',
     assignedTo: complaint.assignedTo,
     resolution: complaint.resolution,
     duplicateOf: complaint.duplicateOf,
