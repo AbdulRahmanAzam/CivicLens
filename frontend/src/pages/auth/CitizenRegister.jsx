@@ -46,8 +46,13 @@ const CitizenRegister = () => {
     if (!formData.cnic.trim()) newErrors.cnic = 'CNIC is required';
     if (!formData.address.trim()) newErrors.address = 'Address is required';
     if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      newErrors.password = 'Password must contain uppercase, lowercase, and a number';
+    }
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -67,7 +72,7 @@ const CitizenRegister = () => {
     setApiError('');
 
     try {
-      // Prepare registration data
+      // Prepare registration data - include confirmPassword for backend validation
       const userData = {
         name: formData.fullName,
         email: formData.email,
@@ -76,6 +81,7 @@ const CitizenRegister = () => {
         address: formData.address,
         city: formData.city,
         password: formData.password,
+        confirmPassword: formData.confirmPassword, // Required by backend
         role: 'citizen', // Default role for citizen registration
       };
 
