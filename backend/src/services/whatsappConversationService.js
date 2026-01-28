@@ -11,6 +11,8 @@ const complaintService = require('./complaintService');
 const classificationService = require('./classificationService');
 const cloudinaryService = require('./cloudinaryService');
 const geoService = require('./geoService');
+const ragService = require('./ragService');
+const ttsService = require('./ttsService');
 const { WhatsAppUser } = require('../models');
 
 // Message templates
@@ -245,6 +247,15 @@ class WhatsAppConversationService {
         return;
       }
 
+      // Check if this is an informational query (RAG-based response)
+      if (type === 'text' && session.step !== 'confirm') {
+        const isInfoQuery = await ragService.isInformationalQuery(content);
+        if (isInfoQuery) {
+          await this.handleInformationalQuery(phone, content, session);
+          return;
+        }
+      }
+
       // Process based on current step
       switch (session.step) {
         case 'greeting':
@@ -280,8 +291,20 @@ class WhatsAppConversationService {
       await whatsappService.stopTyping(phone);
 
     } catch (error) {
-      console.error('Conversation error:', error);
-      await this.sendMessage(phone, this.getMessage('error'));
+      console.error('❌ Conversation error for', phone, ':', error);
+      console.error('Error stack:', error.stack);
+      console.error('Message data:', JSON.stringify(messageData, null, 2));
+      
+      // Send more specific error message
+      const errorMsg = process.env.NODE_ENV === 'development' 
+        ? `❌ Error: ${error.message}\n\nSend "restart" to try again.`
+        : this.getMessage('error');
+      
+      try {
+        await this.sendMessage(phone, errorMsg);
+      } catch (sendError) {
+        console.error('Failed to send error message:', sendError);
+      }
     }
   }
 
@@ -376,33 +399,41 @@ class WhatsAppConversationService {
     
     // Optionally send web link for location sharing
     if (this.enableLocationWebLink) {
-      await this.sendLocationWebLink(phone);
+      try {
+        await this.sendLocationWebLink(phone);
+      } catch (error) {
+        console.error('Error sending location web link:', error);
+        // Continue without web link
+      }
     }
     
-    // Log the location request
-    await sessionService.addMessage(phone, 'outgoing', 'location_request', 'Location request sent');
+    // Log the location request (don't throw error if it fails)
+    try {
+      await sessionService.addMessage(phone, 'outgoing', 'location_request', 'Location request sent');
+    } catch (error) {
+      console.error('Error logging location request:', error);
+      // Continue without logging
+    }
   }
 
   /**
    * Send web link for location sharing (as backup method)
    */
   async sendLocationWebLink(phone) {
-    try {
-      const session = await sessionService.getSession(phone);
-      if (!session) return;
-
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const locationUrl = `${baseUrl}/share-location?phone=${encodeURIComponent(phone)}&session=${session._id}`;
-
-      // Send link with clear instructions
-      await this.sendMessage(
-        phone,
-        `\n🔗 Or click this link to share location from your browser:\n${locationUrl}`
-      );
-    } catch (error) {
-      console.error('Error sending location web link:', error);
-      // Don't fail the whole flow if web link fails
+    const session = await sessionService.getSession(phone);
+    if (!session) {
+      console.log('Session not found for web link, skipping');
+      return;
     }
+
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const locationUrl = `${baseUrl}/share-location?phone=${encodeURIComponent(phone)}&session=${session._id}`;
+
+    // Send link with clear instructions
+    await this.sendMessage(
+      phone,
+      `\n🔗 Or click this link to share location from your browser:\n${locationUrl}`
+    );
   }
 
   /**
@@ -667,6 +698,52 @@ class WhatsAppConversationService {
     } catch (error) {
       console.error('Status command error:', error);
       await this.sendMessage(phone, '❌ Could not fetch your complaints. Please try again.');
+    }
+  }
+
+  /**
+   * Handle informational queries using RAG
+   */
+  async handleInformationalQuery(phone, query, session) {
+    try {
+      // Check for quick answers first
+      const quickAnswer = ragService.getQuickAnswer(query);
+      if (quickAnswer) {
+        await this.sendMessage(phone, quickAnswer);
+        return;
+      }
+
+      // Get conversation history for context
+      const sessionMessages = session.messages?.slice(-5) || [];
+      const conversationHistory = sessionMessages.map(m => ({
+        role: m.direction === 'incoming' ? 'user' : 'assistant',
+        content: m.content,
+      }));
+
+      // Generate RAG response
+      const response = await ragService.generateResponse(query, conversationHistory);
+
+      // Send text response
+      await this.sendMessage(phone, response);
+
+      // Optionally try TTS for short responses
+      if (ttsService.shouldUseTTS(response)) {
+        const ttsResult = await ttsService.textToSpeech(response);
+        if (ttsResult.success && ttsResult.audioPath) {
+          // TTS is available, could send audio
+          // await whatsappService.sendAudio(phone, ttsResult.audioPath);
+        }
+      }
+
+      // Add a prompt to continue with complaint if needed
+      if (session.step === 'greeting') {
+        await this.sendMessage(phone, '\n💡 *Want to report an issue?* Just describe your complaint and I\'ll help you submit it.');
+      }
+
+    } catch (error) {
+      console.error('RAG query error:', error);
+      // Fallback to standard complaint flow
+      await this.sendMessage(phone, '❌ I couldn\'t process that question. If you want to report an issue, please describe it and I\'ll help you submit a complaint.');
     }
   }
 

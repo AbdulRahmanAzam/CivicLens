@@ -29,7 +29,8 @@ try {
     # Use curl for better download progress
     curl.exe -L -o $ZipPath $WhisperRelease --progress-bar
     Write-Host "  ✓ Downloaded whisper.cpp" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "  ✗ Failed to download whisper.cpp" -ForegroundColor Red
     Write-Host "    Manual download: $WhisperRelease" -ForegroundColor Yellow
     exit 1
@@ -56,7 +57,8 @@ try {
             Copy-Item "$TempDir\*" -Destination $WhisperDir -Recurse -Force
         }
     }
-} catch {
+}
+catch {
     Write-Host "  ✗ Failed to extract: $_" -ForegroundColor Red
     exit 1
 }
@@ -69,7 +71,8 @@ $ModelPath = "$ModelsDir\ggml-small.bin"
 try {
     curl.exe -L -o $ModelPath $ModelUrl --progress-bar
     Write-Host "  ✓ Downloaded ggml-small.bin" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "  ✗ Failed to download model" -ForegroundColor Red
     Write-Host "    Manual download: $ModelUrl" -ForegroundColor Yellow
     exit 1
