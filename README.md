@@ -8,6 +8,7 @@
 
 - **Backend API**: [https://civiclensbackend.abdulrahmanazam.me](https://civiclensbackend.abdulrahmanazam.me)
 - **API Health**: [https://civiclensbackend.abdulrahmanazam.me/api/v1/health](https://civiclensbackend.abdulrahmanazam.me/api/v1/health)
+- **Deployed link**: https://civiclensfast.vercel.app/
 
 ---
 
