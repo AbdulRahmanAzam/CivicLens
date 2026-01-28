@@ -44,10 +44,12 @@ const CitizenLogin = () => {
 
   const getDashboardPath = (role) => {
     switch (role) {
+      case 'website_admin':
       case 'admin':
         return '/admin/dashboard';
       case 'mayor':
         return '/mayor/dashboard';
+      case 'town_chairman':
       case 'township_officer':
         return '/township/dashboard';
       case 'uc_chairman':

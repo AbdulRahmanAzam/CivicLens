@@ -188,10 +188,11 @@ const CivicLensMap = ({
 
   // Filter complaints client-side for search
   const filteredComplaints = useMemo(() => {
-    let result = complaints;
+    // Ensure complaints is always an array before filtering
+    let result = Array.isArray(complaints) ? complaints : [];
 
     // Apply search query filter
-    if (filters.searchQuery) {
+    if (filters.searchQuery && result.length > 0) {
       const query = filters.searchQuery.toLowerCase();
       result = result.filter(c => {
         const text = (c.text || c.description || '').toLowerCase();
@@ -201,7 +202,7 @@ const CivicLensMap = ({
     }
 
     // Apply client-side category filter if categories selected
-    if (filters.categories.length > 0) {
+    if (filters.categories?.length > 0 && result.length > 0) {
       result = result.filter(c => {
         const category = c.category?.primary || c.category || 'Other';
         return filters.categories.includes(category);
@@ -209,15 +210,17 @@ const CivicLensMap = ({
     }
 
     // Apply status filter
-    if (filters.status.length > 0) {
+    if (filters.status?.length > 0 && result.length > 0) {
       result = result.filter(c => filters.status.includes(c.status));
     }
 
     // Apply severity filter
-    result = result.filter(c => {
-      const severity = c.severity || 5;
-      return severity >= filters.severity.min && severity <= filters.severity.max;
-    });
+    if (result.length > 0) {
+      result = result.filter(c => {
+        const severity = c.severity || 5;
+        return severity >= filters.severity?.min && severity <= filters.severity?.max;
+      });
+    }
 
     return result;
   }, [complaints, filters]);

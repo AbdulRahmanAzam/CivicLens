@@ -3,7 +3,7 @@
  * Map view for officials to see complaints in their territory
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { complaintsApi, territoriesApi } from '../../services/api';
 import { useAuth } from '../../contexts';
@@ -69,7 +69,7 @@ const TerritoryPage = () => {
   };
 
   // Fetch data
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -86,9 +86,9 @@ const TerritoryPage = () => {
       if (user?.territory) {
         try {
           const territoryRes = await territoriesApi.getTerritory(user.territory);
-          setTerritory(territoryRes.data.data);
+          setTerritory(territoryRes.data);
         } catch (err) {
-          console.log('Territory not found');
+          console.log('Territory not found:', err);
         }
       }
     } catch (err) {
@@ -96,11 +96,11 @@ const TerritoryPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, severityFilter, user?.territory]);
 
   useEffect(() => {
     fetchData();
-  }, [statusFilter, severityFilter]);
+  }, [fetchData]);
 
   // Handle marker click
   const handleMarkerClick = (complaint) => {

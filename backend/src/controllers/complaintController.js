@@ -28,24 +28,39 @@ const createComplaint = asyncHandler(async (req, res) => {
     ucId, // Optional: manual UC selection
   } = req.body;
 
-  const lat = parseFloat(latitude);
-  const lng = parseFloat(longitude);
+  // Validate description is provided
+  if (!description || description.trim().length === 0) {
+    throw new AppError('Complaint description is required', HTTP_STATUS.BAD_REQUEST);
+  }
 
-  // Automatically assign UC based on location
-  let ucAssignment;
-  if (ucId) {
-    // Manual UC selection - validate it
-    ucAssignment = await ucAssignmentService.validateManualSelection(ucId, lng, lat);
-    if (!ucAssignment.valid) {
-      throw new AppError(ucAssignment.error, HTTP_STATUS.BAD_REQUEST);
-    }
-    ucAssignment.method = 'manual';
-    ucAssignment.confidence = 'manual';
-  } else {
-    // Auto-assign by location
-    ucAssignment = await ucAssignmentService.assignByLocation(lng, lat);
-    if (ucAssignment.error) {
-      throw new AppError(ucAssignment.error, HTTP_STATUS.BAD_REQUEST);
+  const lat = latitude ? parseFloat(latitude) : null;
+  const lng = longitude ? parseFloat(longitude) : null;
+
+  // Automatically assign UC based on location (optional)
+  let ucAssignment = null;
+  if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+    try {
+      if (ucId) {
+        // Manual UC selection - validate it
+        ucAssignment = await ucAssignmentService.validateManualSelection(ucId, lng, lat);
+        if (!ucAssignment.valid) {
+          console.warn('Manual UC selection validation failed:', ucAssignment.error);
+          ucAssignment = null;
+        } else {
+          ucAssignment.method = 'manual';
+          ucAssignment.confidence = 'manual';
+        }
+      } else {
+        // Auto-assign by location
+        ucAssignment = await ucAssignmentService.assignByLocation(lng, lat);
+        if (ucAssignment.error) {
+          console.warn('Auto UC assignment failed:', ucAssignment.error);
+          ucAssignment = null;
+        }
+      }
+    } catch (err) {
+      console.error('UC assignment error:', err);
+      ucAssignment = null;
     }
   }
 
@@ -58,16 +73,17 @@ const createComplaint = asyncHandler(async (req, res) => {
     latitude: lat,
     longitude: lng,
     address,
-    source,
-    // Hierarchy assignment
-    ucId: ucAssignment.ucId,
-    townId: ucAssignment.townId,
-    cityId: ucAssignment.cityId,
-    ucAssignment: {
+    source: source || 'web',
+    // Hierarchy assignment (optional)
+    ucId: ucAssignment?.ucId,
+    ucNumber: ucAssignment?.uc?.ucNumber || ucAssignment?.uc?.code,
+    townId: ucAssignment?.townId,
+    cityId: ucAssignment?.cityId,
+    ucAssignment: ucAssignment ? {
       method: ucAssignment.method,
       confidence: ucAssignment.confidence,
       distance: ucAssignment.distance,
-    },
+    } : null,
     // If authenticated user, link to their account
     citizenUser: req.user?._id,
     ipAddress: req.ip || req.connection.remoteAddress,
@@ -87,8 +103,9 @@ const createComplaint = asyncHandler(async (req, res) => {
     details: {
       complaintId: result.complaint.complaintId,
       category: result.complaint.category.primary,
-      ucId: ucAssignment.ucId?.toString(),
-      source,
+      ucId: ucAssignment?.ucId?.toString(),
+      ucNumber: result.complaint.ucNumber,
+      source: data.source,
     },
     ipAddress: req.ip,
     userAgent: req.get('User-Agent'),
@@ -107,28 +124,21 @@ const createComplaint = asyncHandler(async (req, res) => {
         source: result.complaint.category.classificationSource,
         needsReview: result.complaint.category.needsReview,
       },
-      severity: {
-        score: result.complaint.severity.score,
-        priority: result.complaint.severity.priority,
-        factors: result.complaint.severity.factors,
-      },
       status: result.complaint.status.current,
       location: {
-        address: result.complaint.location.address,
-        area: result.complaint.location.area,
+        address: result.complaint.location?.address,
+        area: result.complaint.location?.area,
+        uc: result.complaint.location?.uc,
       },
       // Include hierarchy info in response
-      hierarchy: {
+      hierarchy: ucAssignment ? {
         uc: ucAssignment.uc?.name,
+        ucNumber: result.complaint.ucNumber,
         town: ucAssignment.town?.name,
         city: ucAssignment.city?.name,
         assignmentMethod: ucAssignment.method,
         confidence: ucAssignment.confidence,
-      },
-      sla: {
-        deadline: result.complaint.slaDeadline,
-        targetHours: result.complaint.slaHours,
-      },
+      } : null,
       duplicateInfo: result.duplicateCheck.isDuplicate
         ? {
             isDuplicate: true,

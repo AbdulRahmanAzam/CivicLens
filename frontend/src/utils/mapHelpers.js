@@ -195,15 +195,46 @@ export const getUCStyle = (feature, isHovered = false, isSelected = false) => ({
 });
 
 /**
- * Town boundary style
+ * District colors for town boundaries
  */
-export const getTownStyle = (feature, isHovered = false, isSelected = false) => ({
-  color: isSelected ? '#052E16' : '#166534',
-  weight: isSelected ? 4 : isHovered ? 3 : 2,
-  opacity: isSelected ? 1 : isHovered ? 0.9 : 0.7,
-  fillColor: 'transparent',
-  fillOpacity: 0,
-});
+export const DISTRICT_COLORS = {
+  'Central': '#3B82F6',   // Blue
+  'East': '#10B981',      // Green
+  'West': '#F59E0B',      // Amber
+  'Malir': '#8B5CF6',     // Purple
+  'Korangi': '#EF4444',   // Red
+  'South': '#EC4899',     // Pink
+  'Keamari': '#06B6D4',   // Cyan
+  'default': '#166534',   // Primary green
+};
+
+/**
+ * Town boundary style - BOLD borders for clear separation
+ * @param {Object} feature - GeoJSON feature with properties
+ * @param {boolean} isHovered - Whether town is being hovered
+ * @param {boolean} isSelected - Whether town is selected
+ */
+export const getTownStyle = (feature, isHovered = false, isSelected = false) => {
+  // Get district color from feature properties
+  const district = feature?.properties?.metadata?.district || feature?.properties?.district;
+  const districtColor = DISTRICT_COLORS[district] || DISTRICT_COLORS.default;
+  
+  return {
+    // Bold borders - prominent weight for clear separation
+    color: isSelected ? '#052E16' : districtColor,
+    weight: isSelected ? 6 : isHovered ? 5 : 4,  // Bold: 4px default, 5px hover, 6px selected
+    opacity: isSelected ? 1 : isHovered ? 1 : 0.85,
+    
+    // Subtle fill to show town area
+    fillColor: districtColor,
+    fillOpacity: isSelected ? 0.25 : isHovered ? 0.18 : 0.08,
+    
+    // Solid line for clear boundaries
+    dashArray: null,
+    lineCap: 'round',
+    lineJoin: 'round',
+  };
+};
 
 /**
  * Format date for display

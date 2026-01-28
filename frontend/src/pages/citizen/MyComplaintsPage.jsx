@@ -3,7 +3,7 @@
  * Lists all complaints submitted by the current user
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { complaintsApi } from '../../services/api';
 import { 
@@ -19,7 +19,7 @@ import {
   EmptyState,
   Alert 
 } from '../../components/ui';
-import useFilterStore from '../../store/filterStore';
+// import useFilterStore from '../../store/filterStore';
 
 // Icons
 const PlusIcon = () => (
@@ -136,7 +136,7 @@ const MyComplaintsPage = () => {
   // const { filters, setFilter, resetFilters } = useFilterStore();
 
   // Fetch complaints
-  const fetchComplaints = async () => {
+  const fetchComplaints = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -144,31 +144,33 @@ const MyComplaintsPage = () => {
       const params = {
         page: pagination.page,
         limit: pagination.limit,
-        mineOnly: true,
       };
 
       if (statusFilter) params.status = statusFilter;
       if (searchQuery) params.search = searchQuery;
 
-      const response = await complaintsApi.getComplaints(params);
+      // Use the dedicated getMyComplaints endpoint
+      const response = await complaintsApi.getMyComplaints(params);
       const data = response.data;
 
-      setComplaints(data.data || []);
-      setPagination({
-        ...pagination,
-        total: data.total || 0,
-        totalPages: data.totalPages || 1,
-      });
+      // Handle both possible response structures
+      const complaintsData = data?.complaints || data?.data || data || [];
+      setComplaints(Array.isArray(complaintsData) ? complaintsData : []);
+      setPagination(prev => ({
+        ...prev,
+        total: data?.pagination?.totalItems || data?.total || complaintsData.length || 0,
+        totalPages: data?.pagination?.totalPages || data?.totalPages || 1,
+      }));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch complaints');
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, statusFilter, searchQuery]);
 
   useEffect(() => {
     fetchComplaints();
-  }, [pagination.page, statusFilter]);
+  }, [fetchComplaints]);
 
   // Handle search
   const handleSearch = (e) => {

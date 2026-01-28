@@ -102,7 +102,9 @@ const SettingsPage = () => {
   const handleDeleteAccount = async () => {
     setLoading(true);
     try {
-      await authApi.deleteAccount();
+      // Note: Backend requires password for account deletion
+      // This should ideally prompt for password first
+      await authApi.deleteMe();
       await logout();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete account');

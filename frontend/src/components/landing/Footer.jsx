@@ -1,12 +1,31 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
   const footerLinks = {
-    Platform: [
-      { name: 'Features', href: '#features' },
-      { name: 'How It Works', href: '#how-it-works' },
-      { name: 'Users', href: '#users' },
-      { name: 'Tech', href: '#tech' },
+    Product: [
+      { name: 'Features', href: '/#features' },
+      { name: 'How It Works', href: '/#how-it-works' },
+      { name: 'View Map', href: '/map' },
+      { name: 'Report Issue', href: '/register' },
+    ],
+    Company: [
+      { name: 'About Us', href: '/about' },
+      { name: 'Contact', href: '/contact' },
+      { name: 'Careers', href: '#' },
+      { name: 'Press', href: '#' },
+    ],
+    Resources: [
+      { name: 'Documentation', href: '#' },
+      { name: 'API Reference', href: '#' },
+      { name: 'Blog', href: '#' },
+      { name: 'Case Studies', href: '#' },
+    ],
+    Legal: [
+      { name: 'Privacy Policy', href: '/privacy' },
+      { name: 'Terms of Service', href: '/terms' },
+      { name: 'Cookie Policy', href: '#' },
+      { name: 'Security', href: '#' },
     ],
   };
 
@@ -46,9 +65,15 @@ const Footer = () => {
               <ul className="space-y-2">
                 {links.map((link) => (
                   <li key={link.name}>
-                    <a href={link.href} className="text-white/60 hover:text-white transition-colors text-sm">
-                      {link.name}
-                    </a>
+                    {link.href.startsWith('#') ? (
+                      <a href={link.href} className="text-white/60 hover:text-white transition-colors text-sm">
+                        {link.name}
+                      </a>
+                    ) : (
+                      <Link to={link.href} className="text-white/60 hover:text-white transition-colors text-sm">
+                        {link.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -78,9 +103,19 @@ const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="py-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-white/60 text-sm">© 2026 CivicLens. All rights reserved.</p>
-          <div className="text-white/40 text-xs">
-            Built for responsive civic operations · Secure by design
+          <p className="text-white/60 text-sm">
+            © 2026 CivicLens. All rights reserved.
+          </p>
+          <div className="flex items-center gap-6">
+            <Link to="/privacy" className="text-white/60 hover:text-white text-sm transition-colors">
+              Privacy
+            </Link>
+            <Link to="/terms" className="text-white/60 hover:text-white text-sm transition-colors">
+              Terms
+            </Link>
+            <a href="#" className="text-white/60 hover:text-white text-sm transition-colors">
+              Cookies
+            </a>
           </div>
         </div>
       </div>
