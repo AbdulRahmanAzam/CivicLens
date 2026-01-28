@@ -308,13 +308,10 @@ const departmentAccess = (req, res, next) => {
  *   - citizen: userId filter (own complaints only)
  */
 const hierarchyAccess = (req, res, next) => {
+  // If no user (public/optionalAuth route), allow access to all public data
   if (!req.user) {
-    return next(
-      new AppError(
-        'You are not logged in. Please login to access this resource.',
-        HTTP_STATUS.UNAUTHORIZED
-      )
-    );
+    req.hierarchyFilter = {};
+    return next();
   }
 
   // Website admins can access everything
@@ -325,7 +322,7 @@ const hierarchyAccess = (req, res, next) => {
 
   // Mayors see their city
   if (req.user.role === 'mayor') {
-    if (!req.user.city) {
+    if (!req.user.cityId) {
       return next(
         new AppError(
           'No city assigned. Please contact administrator.',
@@ -333,13 +330,13 @@ const hierarchyAccess = (req, res, next) => {
         )
       );
     }
-    req.hierarchyFilter = { cityId: req.user.city };
+    req.hierarchyFilter = { cityId: req.user.cityId };
     return next();
   }
 
   // Town chairmen see their town
   if (req.user.role === 'town_chairman') {
-    if (!req.user.town) {
+    if (!req.user.townId) {
       return next(
         new AppError(
           'No town assigned. Please contact administrator.',
@@ -347,13 +344,13 @@ const hierarchyAccess = (req, res, next) => {
         )
       );
     }
-    req.hierarchyFilter = { townId: req.user.town };
+    req.hierarchyFilter = { townId: req.user.townId };
     return next();
   }
 
   // UC chairmen see their UC
   if (req.user.role === 'uc_chairman') {
-    if (!req.user.uc) {
+    if (!req.user.ucId) {
       return next(
         new AppError(
           'No UC assigned. Please contact administrator.',
@@ -361,13 +358,13 @@ const hierarchyAccess = (req, res, next) => {
         )
       );
     }
-    req.hierarchyFilter = { ucId: req.user.uc };
+    req.hierarchyFilter = { ucId: req.user.ucId };
     return next();
   }
 
-  // Citizens see only their own resources
+  // Citizens can view all public complaints (their own complaints are at /my endpoint)
   if (req.user.role === 'citizen') {
-    req.hierarchyFilter = { citizenUser: req.user._id };
+    req.hierarchyFilter = {};
     return next();
   }
 

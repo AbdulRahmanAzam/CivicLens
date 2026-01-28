@@ -329,7 +329,8 @@ class ComplaintService {
       byCategory: {},
       byStatus: {},
       byArea: [],
-      averageResolutionTime: stats.avgResolutionTime[0]?.avgTime || 0,
+      averageResolutionTime: stats.avgResolutionTime?.[0]?.avgTime || 0,
+      averageFeedbackRating: stats.avgFeedbackRating?.[0]?.avgRating || 0,
       todayCount: 0,
       weeklyTrend: [],
     };
