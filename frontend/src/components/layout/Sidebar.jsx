@@ -175,7 +175,7 @@ const Sidebar = () => {
         <button
           onClick={toggleSidebarCollapsed}
           className={clsx(
-            'p-2 rounded-lg hover:bg-foreground/5 text-foreground/50 transition-colors',
+            'p-2 rounded-lg hover:bg-secondary/20 hover:text-primary text-foreground/50 transition-all duration-200',
             sidebarCollapsed && 'mx-auto mt-2'
           )}
         >
@@ -194,10 +194,10 @@ const Sidebar = () => {
               key={item.href}
               to={item.href}
               className={clsx(
-                'flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
+                'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
                 isActive
-                  ? 'bg-primary text-white'
-                  : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground',
+                  ? 'bg-primary text-white shadow-md'
+                  : 'text-foreground/70 hover:bg-secondary/15 hover:text-primary hover:translate-x-1',
                 sidebarCollapsed && 'justify-center px-3'
               )}
               title={sidebarCollapsed ? item.name : undefined}

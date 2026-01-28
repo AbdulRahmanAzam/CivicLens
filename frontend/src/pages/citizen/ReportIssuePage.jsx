@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { complaintsApi, categoriesApi, voiceApi } from '../../services/api';
+import { complaintsApi, categoriesApi, hierarchyApi } from '../../services/api';
+import { useAuth } from '../../contexts';
 import { 
   Button, 
   Input, 
@@ -75,14 +76,17 @@ const ImageIcon = () => (
 
 const ReportIssuePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [location, setLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [detectedUC, setDetectedUC] = useState(null);
   const [images, setImages] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [voiceNote, setVoiceNote] = useState(null);
 
   const {
@@ -92,9 +96,7 @@ const ReportIssuePage = () => {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(reportSchema),
-    defaultValues: {
-      severity: 'medium',
-    },
+    defaultValues: {},
   });
 
   // Fetch categories
@@ -117,7 +119,7 @@ const ReportIssuePage = () => {
     fetchCategories();
   }, []);
 
-  // Get current location
+  // Get current location and detect UC
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser');
@@ -125,6 +127,8 @@ const ReportIssuePage = () => {
     }
 
     setLocationLoading(true);
+    setDetectedUC(null);
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -145,12 +149,29 @@ const ReportIssuePage = () => {
           console.error('Failed to get address:', err);
         }
         
+        // Auto-detect UC by location
+        try {
+          const ucResponse = await hierarchyApi.findUCByLocation(longitude, latitude);
+          if (ucResponse.success && ucResponse.data?.uc) {
+            setDetectedUC({
+              id: ucResponse.data.uc._id,
+              name: ucResponse.data.uc.name,
+              town: ucResponse.data.uc.town?.name,
+              confidence: ucResponse.data.confidence,
+              method: ucResponse.data.assignmentMethod,
+            });
+          }
+        } catch (ucErr) {
+          console.warn('UC detection failed:', ucErr);
+        }
+        
         setLocationLoading(false);
       },
-      (err) => {
+      () => {
         setError('Failed to get your location. Please enable location services.');
         setLocationLoading(false);
-      }
+      },
+      { timeout: 10000, enableHighAccuracy: true }
     );
   };
 
@@ -187,7 +208,7 @@ const ReportIssuePage = () => {
         // Start recording
         setIsRecording(true);
         // Recording logic would be implemented here
-      } catch (err) {
+      } catch {
         setError('Failed to access microphone');
       }
     }
@@ -205,16 +226,22 @@ const ReportIssuePage = () => {
       formData.append('phone', data.phone);
       if (data.email) formData.append('email', data.email);
       formData.append('category', data.category);
-      formData.append('severity', data.severity);
       
       formData.append('latitude', data.latitude);
       formData.append('longitude', data.longitude);
       if (data.address) {
         formData.append('address', data.address);
       }
+      
+      // Include detected UC if available
+      if (detectedUC?.id) {
+        formData.append('ucId', detectedUC.id);
+      }
+      
+      formData.append('source', 'web');
 
       // Append images
-      images.forEach((img, index) => {
+      images.forEach((img) => {
         formData.append('images', img.file);
       });
 
@@ -245,13 +272,6 @@ const ReportIssuePage = () => {
       setLoading(false);
     }
   };
-
-  const severityOptions = [
-    { value: 'low', label: 'Low - Minor inconvenience' },
-    { value: 'medium', label: 'Medium - Needs attention' },
-    { value: 'high', label: 'High - Urgent issue' },
-    { value: 'critical', label: 'Critical - Emergency' },
-  ];
 
   if (success) {
     return (
@@ -401,6 +421,26 @@ const ReportIssuePage = () => {
                 <p className="mt-2 text-sm text-foreground/60">
                   📍 Location captured: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
                 </p>
+              )}
+              {/* UC Detection Info */}
+              {detectedUC && (
+                <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">
+                      UC Detected: {detectedUC.name}
+                      {detectedUC.town && <span className="font-normal text-green-600"> ({detectedUC.town})</span>}
+                    </p>
+                    <p className="text-xs text-green-600">
+                      {detectedUC.method === 'geo_fence' ? 'Within UC boundary' : 'Nearest UC'} 
+                      {detectedUC.confidence && ` • ${Math.round(detectedUC.confidence * 100)}% confidence`}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
 

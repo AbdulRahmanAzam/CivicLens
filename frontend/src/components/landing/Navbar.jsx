@@ -15,10 +15,11 @@ const Navbar = () => {
   }, []);
 
   const navLinks = [
-    { name: 'Features', href: '#features' },
-    { name: 'How It Works', href: '#how-it-works' },
-    { name: 'Users', href: '#users' },
-    { name: 'Tech', href: '#tech' },
+    { name: 'Features', href: '#features', type: 'anchor' },
+    { name: 'How It Works', href: '#how-it-works', type: 'anchor' },
+    { name: 'Map', href: '/map', type: 'route' },
+    { name: 'About', href: '/about', type: 'route' },
+    { name: 'Contact', href: '/contact', type: 'route' },
   ];
 
   return (
@@ -32,7 +33,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <div className="w-10 h-10">
               <svg viewBox="0 0 100 100" className="w-full h-full">
                 <circle cx="50" cy="50" r="45" fill="#166534" />
@@ -43,33 +44,32 @@ const Navbar = () => {
               </svg>
             </div>
             <span className="text-xl font-bold text-foreground">CivicLens</span>
-          </a>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-foreground/80 hover:text-primary font-medium transition-colors duration-200"
-              >
-                {link.name}
-              </a>
+              link.type === 'route' ? (
+                <Link
+                  key={link.name}
+                  to={link.href}
+                  className="text-foreground/80 hover:text-primary font-medium transition-colors duration-200"
+                >
+                  {link.name}
+                </Link>
+              ) : (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  className="text-foreground/80 hover:text-primary font-medium transition-colors duration-200"
+                >
+                  {link.name}
+                </a>
+              )
             ))}
-            <div className="flex items-center gap-3">
-              <Link
-                to="/login"
-                className="px-5 py-2.5 rounded-full border border-primary/30 text-primary font-semibold transition-all duration-200 hover:border-primary/60"
-              >
-                Citizen Login
-              </Link>
-              <Link
-                to="/citizen/dashboard"
-                className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-full font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-primary/25"
-              >
-                Report Issue
-              </Link>
-            </div>
+            <Link to="/register" className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-full font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-primary/25">
+              Report Issue
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -105,32 +105,32 @@ const Navbar = () => {
         {/* Mobile Menu */}
         <div
           className={`md:hidden transition-all duration-300 overflow-hidden ${
-            isMobileMenuOpen ? 'max-h-64 pb-4' : 'max-h-0'
+            isMobileMenuOpen ? 'max-h-80 pb-4' : 'max-h-0'
           }`}
         >
           <div className="flex flex-col gap-4 pt-4 border-t border-primary/10">
             {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-foreground/80 hover:text-primary font-medium transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.name}
-              </a>
+              link.type === 'route' ? (
+                <Link
+                  key={link.name}
+                  to={link.href}
+                  className="text-foreground/80 hover:text-primary font-medium transition-colors"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {link.name}
+                </Link>
+              ) : (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  className="text-foreground/80 hover:text-primary font-medium transition-colors"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {link.name}
+                </a>
+              )
             ))}
-            <Link
-              to="/login"
-              className="px-6 py-2.5 rounded-full border border-primary/30 text-primary font-semibold w-fit"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Citizen Login
-            </Link>
-            <Link
-              to="/citizen/dashboard"
-              className="bg-primary text-white px-6 py-2.5 rounded-full font-semibold w-fit"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <Link to="/register" className="bg-primary text-white px-6 py-2.5 rounded-full font-semibold w-fit">
               Report Issue
             </Link>
           </div>

@@ -8,16 +8,13 @@ import { territoriesApi } from '../../services/api';
 import { 
   Button, 
   Card, 
-  CardHeader, 
-  CardTitle, 
   CardContent,
   Badge,
   Input,
   Select,
   Spinner,
   EmptyState,
-  Alert,
-  Textarea
+  Alert
 } from '../../components/ui';
 import { Modal, ConfirmDialog } from '../../components/ui/Modal';
 
@@ -46,12 +43,10 @@ const TrashIcon = () => (
   </svg>
 );
 
-// Territory types
+// Territory types - matches backend
 const TERRITORY_TYPES = [
-  { value: 'city', label: 'City' },
-  { value: 'township', label: 'Township' },
-  { value: 'uc', label: 'Union Council' },
-  { value: 'ward', label: 'Ward' },
+  { value: 'Town', label: 'Township/Town' },
+  { value: 'UC', label: 'Union Council' },
 ];
 
 const TerritoryCard = ({ territory, onEdit, onDelete }) => (
@@ -63,21 +58,30 @@ const TerritoryCard = ({ territory, onEdit, onDelete }) => (
             <Badge variant="primary" size="sm">
               {territory.type}
             </Badge>
-            {territory.parent && (
+            {territory.town && (
               <Badge variant="outline" size="sm">
-                {territory.parent.name}
+                {territory.town}
+              </Badge>
+            )}
+            {territory.city && (
+              <Badge variant="secondary" size="sm">
+                {territory.city}
               </Badge>
             )}
           </div>
           <h3 className="font-semibold text-foreground">{territory.name}</h3>
-          {territory.description && (
-            <p className="text-sm text-foreground/60 mt-1 line-clamp-2">
-              {territory.description}
+          {territory.code && (
+            <p className="text-sm text-foreground/60 mt-1">
+              Code: {territory.code}
             </p>
           )}
           <div className="flex items-center gap-4 mt-3 text-xs text-foreground/50">
-            <span>{territory.complaintsCount || 0} complaints</span>
-            <span>{territory.officialsCount || 0} officials</span>
+            {territory.population > 0 && (
+              <span>Pop: {territory.population.toLocaleString()}</span>
+            )}
+            {territory.ucNumber && (
+              <span>UC #{territory.ucNumber}</span>
+            )}
           </div>
         </div>
         <div className="flex gap-1">
@@ -103,7 +107,8 @@ const TerritoryCard = ({ territory, onEdit, onDelete }) => (
 
 const ManageTerritoriesPage = () => {
   const [territories, setTerritories] = useState([]);
-  const [parentTerritories, setParentTerritories] = useState([]);
+  const [towns, setTowns] = useState([]);
+  const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,10 +121,12 @@ const ManageTerritoriesPage = () => {
   const [selectedTerritory, setSelectedTerritory] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'township',
-    parent: '',
-    description: '',
-    boundaries: '',
+    type: 'UC',
+    townId: '',
+    cityId: '',
+    code: '',
+    ucNumber: '',
+    population: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -127,11 +134,30 @@ const ManageTerritoriesPage = () => {
   const fetchTerritories = async () => {
     setLoading(true);
     try {
-      const response = await territoriesApi.getTerritories();
-      const data = response.data.data || [];
-      setTerritories(data);
-      setParentTerritories(data.filter(t => t.type === 'city' || t.type === 'township'));
+      // Fetch all data in parallel
+      const [territoriesRes, townsRes, citiesRes] = await Promise.all([
+        territoriesApi.getTerritories(),
+        territoriesApi.getTownList(),
+        territoriesApi.getCities(),
+      ]);
+      
+      // Combine towns and UCs into a single list with type indicator
+      const allTerritories = [
+        ...territoriesRes.territories.filter(t => t.type === 'Town').map(t => ({
+          ...t,
+          type: 'Town',
+        })),
+        ...territoriesRes.territories.filter(t => t.type === 'UC').map(t => ({
+          ...t,
+          type: 'UC',
+        })),
+      ];
+      
+      setTerritories(allTerritories);
+      setTowns(townsRes.data || []);
+      setCities(citiesRes.data || []);
     } catch (err) {
+      console.error('Error fetching territories:', err);
       setError(err.response?.data?.message || 'Failed to load territories');
     } finally {
       setLoading(false);
@@ -153,10 +179,12 @@ const ManageTerritoriesPage = () => {
   const handleCreate = () => {
     setFormData({
       name: '',
-      type: 'township',
-      parent: '',
-      description: '',
-      boundaries: '',
+      type: 'UC',
+      townId: '',
+      cityId: '',
+      code: '',
+      ucNumber: '',
+      population: '',
     });
     setCreateModal(true);
   };
@@ -167,9 +195,11 @@ const ManageTerritoriesPage = () => {
     setFormData({
       name: territory.name,
       type: territory.type,
-      parent: territory.parent?._id || '',
-      description: territory.description || '',
-      boundaries: territory.boundaries ? JSON.stringify(territory.boundaries) : '',
+      townId: territory.town_id || '',
+      cityId: territory.city_id || '',
+      code: territory.code || '',
+      ucNumber: territory.ucNumber || territory.uc_id || '',
+      population: territory.population || '',
     });
     setEditModal(true);
   };
@@ -179,10 +209,19 @@ const ManageTerritoriesPage = () => {
     setSubmitting(true);
     try {
       const payload = {
-        ...formData,
-        boundaries: formData.boundaries ? JSON.parse(formData.boundaries) : undefined,
-        parent: formData.parent || undefined,
+        type: formData.type,
+        name: formData.name,
+        code: formData.code || undefined,
+        population: formData.population ? parseInt(formData.population) : undefined,
       };
+
+      // Add type-specific fields
+      if (formData.type === 'UC') {
+        payload.townId = formData.townId;
+        payload.ucNumber = formData.ucNumber ? parseInt(formData.ucNumber) : undefined;
+      } else if (formData.type === 'Town') {
+        payload.cityId = formData.cityId;
+      }
 
       if (isCreate) {
         await territoriesApi.createTerritory(payload);
@@ -193,6 +232,7 @@ const ManageTerritoriesPage = () => {
       await fetchTerritories();
       setCreateModal(false);
       setEditModal(false);
+      setError(null);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save territory');
     } finally {
@@ -222,16 +262,10 @@ const ManageTerritoriesPage = () => {
   // Form modal content
   const FormModalContent = ({ isCreate = false }) => (
     <div className="space-y-4">
-      <Input
-        label="Name"
-        placeholder="Territory name"
-        value={formData.name}
-        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-      />
       <Select
         label="Type"
         value={formData.type}
-        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+        onChange={(e) => setFormData({ ...formData, type: e.target.value, townId: '', cityId: '' })}
       >
         {TERRITORY_TYPES.map((type) => (
           <option key={type.value} value={type.value}>
@@ -239,34 +273,71 @@ const ManageTerritoriesPage = () => {
           </option>
         ))}
       </Select>
-      <Select
-        label="Parent Territory (Optional)"
-        value={formData.parent}
-        onChange={(e) => setFormData({ ...formData, parent: e.target.value })}
-      >
-        <option value="">No Parent</option>
-        {parentTerritories
-          .filter(t => t._id !== selectedTerritory?._id)
-          .map((t) => (
-            <option key={t._id} value={t._id}>
-              {t.name} ({t.type})
+
+      <Input
+        label="Name"
+        placeholder="Territory name"
+        value={formData.name}
+        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        required
+      />
+
+      <Input
+        label="Code (Optional)"
+        placeholder="e.g., KHI-UC001"
+        value={formData.code}
+        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+      />
+
+      {formData.type === 'UC' && (
+        <>
+          <Select
+            label="Parent Town"
+            value={formData.townId}
+            onChange={(e) => setFormData({ ...formData, townId: e.target.value })}
+            required
+          >
+            <option value="">Select Town</option>
+            {towns.map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.name} {t.city ? `(${t.city})` : ''}
+              </option>
+            ))}
+          </Select>
+          <Input
+            label="UC Number"
+            type="number"
+            placeholder="e.g., 1"
+            value={formData.ucNumber}
+            onChange={(e) => setFormData({ ...formData, ucNumber: e.target.value })}
+          />
+        </>
+      )}
+
+      {formData.type === 'Town' && (
+        <Select
+          label="Parent City"
+          value={formData.cityId}
+          onChange={(e) => setFormData({ ...formData, cityId: e.target.value })}
+          required
+        >
+          <option value="">Select City</option>
+          {cities.map((c) => (
+            <option key={c._id} value={c._id}>
+              {c.name}
             </option>
           ))}
-      </Select>
-      <Textarea
-        label="Description"
-        placeholder="Brief description of the territory"
-        value={formData.description}
-        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-        rows={3}
+        </Select>
+      )}
+
+      <Input
+        label="Population (Optional)"
+        type="number"
+        placeholder="e.g., 50000"
+        value={formData.population}
+        onChange={(e) => setFormData({ ...formData, population: e.target.value })}
       />
-      <Textarea
-        label="Boundaries (GeoJSON)"
-        placeholder='{"type": "Polygon", "coordinates": [...]}'
-        value={formData.boundaries}
-        onChange={(e) => setFormData({ ...formData, boundaries: e.target.value })}
-        rows={4}
-      />
+
       <div className="flex justify-end gap-3 pt-4">
         <Button
           variant="outline"

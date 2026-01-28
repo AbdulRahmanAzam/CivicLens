@@ -142,11 +142,11 @@ townSchema.post('save', async function(doc) {
   try {
     const City = mongoose.model('City');
     const city = await City.findById(doc.city);
-    if (city) {
+    if (city && city.updateStats) {
       await city.updateStats();
     }
   } catch (error) {
-    console.error('Error updating city stats:', error);
+    // Silently fail - UC model may not be loaded in seed scripts
   }
 });
 

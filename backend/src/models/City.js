@@ -117,14 +117,13 @@ citySchema.virtual('towns', {
 /**
  * Pre-save middleware to generate city code if not provided
  */
-citySchema.pre('save', function(next) {
+citySchema.pre('save', async function() {
   if (this.isNew && !this.code) {
     // Generate code from first 3 letters of city name + random suffix
     const prefix = this.name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
     const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
     this.code = `${prefix}${suffix}`;
   }
-  next();
 });
 
 /**

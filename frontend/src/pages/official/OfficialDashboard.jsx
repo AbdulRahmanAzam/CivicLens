@@ -80,7 +80,7 @@ const formatDate = (date) => {
   });
 };
 
-const StatCard = ({ title, value, icon: Icon, trend, color = 'primary' }) => (
+const StatCard = ({ title, value, icon, trend, color = 'primary' }) => (
   <Card>
     <CardContent className="p-6">
       <div className="flex items-center justify-between">
@@ -95,7 +95,7 @@ const StatCard = ({ title, value, icon: Icon, trend, color = 'primary' }) => (
           )}
         </div>
         <div className={`w-12 h-12 rounded-xl bg-${color}/10 text-${color} flex items-center justify-center`}>
-          <Icon />
+          {icon}
         </div>
       </div>
     </CardContent>
@@ -219,32 +219,32 @@ const OfficialDashboard = () => {
         <StatCard
           title="Total Complaints"
           value={stats.total}
-          icon={ClipboardIcon}
+          icon={<ClipboardIcon />}
           color="primary"
         />
         <StatCard
           title="Pending"
           value={stats.pending}
-          icon={ClockIcon}
+          icon={<ClockIcon />}
           color="yellow-600"
         />
         <StatCard
           title="In Progress"
           value={stats.inProgress}
-          icon={ClockIcon}
+          icon={<ClockIcon />}
           color="blue-600"
         />
         <StatCard
           title="Resolved"
           value={stats.resolved}
-          icon={CheckCircleIcon}
+          icon={<CheckCircleIcon />}
           color="green-600"
           trend="+12% this week"
         />
         <StatCard
           title="Critical"
           value={stats.critical}
-          icon={AlertIcon}
+          icon={<AlertIcon />}
           color="red-600"
         />
       </div>

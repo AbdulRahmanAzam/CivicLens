@@ -8,22 +8,25 @@ import { authApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
-// User roles hierarchy
+// User roles hierarchy - matches backend roles
 export const ROLES = {
   CITIZEN: 'citizen',
   UC_CHAIRMAN: 'uc_chairman',
-  TOWNSHIP_OFFICER: 'township_officer',
+  TOWN_CHAIRMAN: 'town_chairman',
   MAYOR: 'mayor',
-  ADMIN: 'admin',
+  WEBSITE_ADMIN: 'website_admin',
+  // Aliases for convenience
+  ADMIN: 'website_admin',
+  TOWNSHIP_OFFICER: 'town_chairman',
 };
 
 // Role hierarchy for permission checks
 const ROLE_HIERARCHY = {
   [ROLES.CITIZEN]: 1,
   [ROLES.UC_CHAIRMAN]: 2,
-  [ROLES.TOWNSHIP_OFFICER]: 3,
+  [ROLES.TOWN_CHAIRMAN]: 3,
   [ROLES.MAYOR]: 4,
-  [ROLES.ADMIN]: 5,
+  [ROLES.WEBSITE_ADMIN]: 5,
 };
 
 export const AuthProvider = ({ children }) => {
@@ -157,11 +160,13 @@ export const AuthProvider = ({ children }) => {
     if (!user?.role) return '/login';
     
     switch (user.role) {
-      case ROLES.ADMIN:
+      case 'website_admin':
+      case ROLES.WEBSITE_ADMIN:
         return '/admin/dashboard';
       case ROLES.MAYOR:
         return '/mayor/dashboard';
-      case ROLES.TOWNSHIP_OFFICER:
+      case 'town_chairman':
+      case ROLES.TOWN_CHAIRMAN:
         return '/township/dashboard';
       case ROLES.UC_CHAIRMAN:
         return '/uc/dashboard';

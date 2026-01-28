@@ -44,14 +44,23 @@ class ComplaintService {
       source = 'web',
     } = data;
 
-    console.log('[ComplaintService] Starting AI pipeline for new complaint...');
+    console.log('[ComplaintService] Starting complaint creation (simplified)...');
 
-    // Get location details via reverse geocoding
-    const location = await geoService.reverseGeocode(latitude, longitude);
-    
-    // Override with provided address if available
-    if (address) {
-      location.address = address;
+    // Get location details via reverse geocoding if coordinates provided
+    let location = null;
+    if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+      try {
+        location = await geoService.reverseGeocode(latitude, longitude);
+        // Override with provided address if available
+        if (address) {
+          location.address = address;
+        }
+      } catch (err) {
+        console.warn('Geocoding failed:', err.message);
+        location = address ? { address } : null;
+      }
+    } else if (address) {
+      location = { address };
     }
 
     // Upload images to local storage (fallback to Cloudinary if buffer is available)
@@ -83,35 +92,39 @@ class ComplaintService {
       }
     }
 
-    // Step 1: AI Classification (GROQ + local fallback)
+    // Step 1: AI Classification (GROQ + local fallback) - optional, wrapped in try-catch
     console.log('[AI Pipeline] Step 1: Classifying complaint...');
-    const classification = await classificationService.classifyComplaint(description);
-    console.log(`[AI Pipeline] Classified as: ${classification.category} (${classification.confidence} confidence, source: ${classification.source})`);
+    let classification;
+    try {
+      classification = await classificationService.classifyComplaint(description);
+      console.log(`[AI Pipeline] Classified as: ${classification.category} (${classification.confidence} confidence, source: ${classification.source})`);
+    } catch (err) {
+      console.error('Classification failed:', err.message);
+      classification = {
+        category: 'Others',
+        confidence: 0,
+        source: 'default',
+        urgency: 'medium',
+        needsReview: true,
+      };
+    }
 
-    // Step 2: Duplicate Detection (geo + text similarity)
-    console.log('[AI Pipeline] Step 2: Checking for duplicates...');
-    const duplicateCheck = await duplicateService.checkForDuplicates({
-      description,
-      longitude,
-      latitude,
-      category: classification.category,
-    });
-    console.log(`[AI Pipeline] Duplicate check: ${duplicateCheck.isDuplicate ? 'DUPLICATE FOUND' : 'No duplicates'}, ${duplicateCheck.nearbyCount} nearby complaints`);
-
-    // Step 3: Severity Scoring (rule-based)
-    console.log('[AI Pipeline] Step 3: Calculating severity...');
-    const severity = await severityService.calculateSeverity({
-      description,
-      category: classification.category,
-      longitude,
-      latitude,
-      reportedUrgency: classification.urgency,
-    });
-    console.log(`[AI Pipeline] Severity: ${severity.score}/10 (${severity.priority})`);
-
-    // Create the complaint with AI-enriched data
-    // Calculate SLA deadline based on category
-    const slaInfo = await ucAssignmentService.calculateSLADeadline(classification.category);
+    // Step 2: Duplicate Detection (geo + text similarity) - optional, only if location available
+    let duplicateCheck = { isDuplicate: false, nearbyCount: 0 };
+    if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+      try {
+        console.log('[AI Pipeline] Step 2: Checking for duplicates...');
+        duplicateCheck = await duplicateService.checkForDuplicates({
+          description,
+          longitude,
+          latitude,
+          category: classification.category,
+        });
+        console.log(`[AI Pipeline] Duplicate check: ${duplicateCheck.isDuplicate ? 'DUPLICATE FOUND' : 'No duplicates'}, ${duplicateCheck.nearbyCount} nearby complaints`);
+      } catch (err) {
+        console.error('Duplicate check failed:', err.message);
+      }
+    }
     
     const complaint = new Complaint({
       citizenInfo: {
@@ -131,31 +144,23 @@ class ComplaintService {
         classificationSource: classification.source,
         needsReview: classification.needsReview,
       },
-      location,
-      // Hierarchy assignment from controller
-      ucId: data.ucId,
-      townId: data.townId,
-      cityId: data.cityId,
-      // SLA tracking
-      slaDeadline: slaInfo.deadline,
-      slaHours: slaInfo.targetHours,
+      ...(location && { location }),
+      // Hierarchy assignment from controller (optional)
+      ...(data.ucId && { ucId: data.ucId }),
+      ...(data.ucNumber && { ucNumber: data.ucNumber }),
+      ...(data.townId && { townId: data.townId }),
+      ...(data.cityId && { cityId: data.cityId }),
       images,
       source,
-      severity: {
-        score: severity.score,
-        factors: severity.factors,
-        priority: severity.priority,
-      },
-      duplicateOf: duplicateCheck.potentialDuplicate,
+      ...(duplicateCheck.potentialDuplicate && { duplicateOf: duplicateCheck.potentialDuplicate }),
       metadata: {
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
         aiProcessing: {
           classificationTime: classification.processingTime,
           duplicateCheckDetails: duplicateCheck.checkDetails,
-          severityDetails: severity.details,
         },
-        ucAssignment: data.ucAssignment,
+        ...(data.ucAssignment && { ucAssignment: data.ucAssignment }),
       },
     });
 
@@ -169,13 +174,12 @@ class ComplaintService {
       );
     }
 
-    console.log(`[AI Pipeline] Complete! Complaint ${complaint.complaintId} created.`);
+    console.log(`[Complaint Service] Complete! Complaint ${complaint.complaintId} created.`);
 
     return {
       complaint,
       classification,
       duplicateCheck,
-      severity,
     };
   }
 

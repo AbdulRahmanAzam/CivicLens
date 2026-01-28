@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import './App.css'
 import './styles/map.css'
 import { AuthProvider } from './contexts'
@@ -13,11 +14,15 @@ import ProtectedRoute, {
 } from './components/ProtectedRoute'
 import { 
   LandingPage, 
+  MapPage,
+  AboutPage,
+  ContactPage,
+  PrivacyPolicyPage,
+  TermsOfServicePage,
   CitizenLogin, 
   CitizenRegister, 
   OfficialLogin, 
   AdminLogin,
-  MapPage,
   AdminDashboard,
   CitizenDashboard,
   MayorDashboard,
@@ -80,9 +85,23 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+          }}
+        />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
           
           {/* Map View - Public */}
           <Route path="/map" element={<MapPage />} />
