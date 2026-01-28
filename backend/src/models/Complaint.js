@@ -240,6 +240,13 @@ const complaintSchema = new mongoose.Schema({
     default: 'web',
   },
 
+  // Link to authenticated citizen user (if logged in when creating complaint)
+  citizenUser: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true,
+  },
+
   // UC/Town/City hierarchy references (optional, auto-detected from location)
   ucId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -267,6 +274,12 @@ const complaintSchema = new mongoose.Schema({
     type: ucAssignmentSchema,
   },
 
+  // Assigned officer/user (for tracking who is handling the complaint)
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+
   // Updated status lifecycle
   status: {
     current: {
@@ -285,6 +298,58 @@ const complaintSchema = new mongoose.Schema({
   // Citizen feedback (after closure)
   citizenFeedback: {
     type: citizenFeedbackSchema,
+  },
+
+  // Resolution details
+  resolution: {
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    resolvedAt: Date,
+    remarks: String,
+    feedback: {
+      rating: Number,
+      comment: String,
+      citizenResolved: Boolean,
+      submittedAt: Date,
+    },
+  },
+
+  // For tracking duplicate complaints
+  linkedComplaints: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Complaint',
+  }],
+
+  // Severity score for prioritization
+  severity: {
+    score: {
+      type: Number,
+      default: 50,
+      min: 0,
+      max: 100,
+    },
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'critical'],
+      default: 'medium',
+    },
+    factors: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+  },
+
+  // SLA tracking
+  slaDeadline: Date,
+  slaHours: {
+    type: Number,
+    default: 48,
+  },
+  slaBreach: {
+    type: Boolean,
+    default: false,
   },
 
   // Immutability tracking
@@ -550,13 +615,13 @@ complaintSchema.statics.getStats = async function(filters = {}) {
     matchStage.createdAt = { ...matchStage.createdAt, $lte: new Date(filters.dateTo) };
   }
   if (filters.ucId) {
-    matchStage.ucId = mongoose.Types.ObjectId(filters.ucId);
+    matchStage.ucId = new mongoose.Types.ObjectId(filters.ucId);
   }
   if (filters.townId) {
-    matchStage.townId = mongoose.Types.ObjectId(filters.townId);
+    matchStage.townId = new mongoose.Types.ObjectId(filters.townId);
   }
   if (filters.cityId) {
-    matchStage.cityId = mongoose.Types.ObjectId(filters.cityId);
+    matchStage.cityId = new mongoose.Types.ObjectId(filters.cityId);
   }
   if (filters.area) {
     matchStage['location.area'] = filters.area;

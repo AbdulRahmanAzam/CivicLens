@@ -633,26 +633,26 @@ const formatComplaintResponse = (complaint) => {
     },
     status: complaint.status?.current || complaint.status || 'submitted',
     statusHistory: complaint.status?.history || [],
-    severity: {
-      score: complaint.severity?.score ?? null,
-      priority: complaint.severity?.priority || 'medium',
-      factors: complaint.severity?.factors || {},
-    },
-    location: {
-      coordinates: complaint.location?.coordinates || [],
-      address: complaint.location?.address || '',
-      area: complaint.location?.area || '',
-      ward: complaint.location?.ward || '',
-      pincode: complaint.location?.pincode || '',
-    },
-    // Hierarchy information
+    severity: complaint.severity ? {
+      score: complaint.severity.score || 50,
+      priority: complaint.severity.priority || 'medium',
+      factors: complaint.severity.factors || {},
+    } : { score: 50, priority: 'medium', factors: {} },
+    location: complaint.location ? {
+      coordinates: Array.isArray(complaint.location.coordinates) ? complaint.location.coordinates : [],
+      address: complaint.location.address || '',
+      area: complaint.location.area || null,
+      ward: complaint.location.ward || null,
+      pincode: complaint.location.pincode || null,
+    } : { coordinates: [], address: '' },
+    // Hierarchy information (handle both ObjectId and populated objects)
     hierarchy: {
-      ucId: complaint.ucId,
-      townId: complaint.townId,
-      cityId: complaint.cityId,
-      ucName: complaint.ucId?.name,
-      townName: complaint.townId?.name,
-      cityName: complaint.cityId?.name,
+      ucId: typeof complaint.ucId === 'object' && complaint.ucId !== null ? complaint.ucId._id : complaint.ucId,
+      townId: typeof complaint.townId === 'object' && complaint.townId !== null ? complaint.townId._id : complaint.townId,
+      cityId: typeof complaint.cityId === 'object' && complaint.cityId !== null ? complaint.cityId._id : complaint.cityId,
+      ucName: typeof complaint.ucId === 'object' && complaint.ucId !== null ? complaint.ucId.name : null,
+      townName: typeof complaint.townId === 'object' && complaint.townId !== null ? complaint.townId.name : null,
+      cityName: typeof complaint.cityId === 'object' && complaint.cityId !== null ? complaint.cityId.name : null,
     },
     // SLA tracking
     sla: {
