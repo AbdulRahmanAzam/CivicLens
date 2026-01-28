@@ -98,72 +98,10 @@ const citizenFeedbackSchema = new mongoose.Schema({
 }, { _id: false });
 
 /**
- * Resolution sub-schema
+ * Resolution sub-schema - REMOVED
+ * Severity sub-schema - REMOVED
+ * SLA tracking sub-schema - REMOVED
  */
-const resolutionSchema = new mongoose.Schema({
-  description: String,
-  resolvedAt: Date,
-  resolvedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  },
-  closedAt: Date,
-  photos: [imageSchema], // Resolution proof photos
-}, { _id: false });
-
-/**
- * Severity sub-schema
- */
-const severitySchema = new mongoose.Schema({
-  score: {
-    type: Number,
-    min: 1,
-    max: 10,
-    default: 5,
-  },
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'critical'],
-    default: 'medium',
-  },
-  factors: {
-    frequency: { type: Number, default: 0 },
-    duration: { type: Number, default: 0 },
-    categoryUrgency: { type: Number, default: 0 },
-    areaImpact: { type: Number, default: 0 },
-    citizenUrgency: { type: Number, default: 0 },
-  },
-  // Timestamp when severity was locked (immutable after creation)
-  lockedAt: {
-    type: Date,
-  },
-}, { _id: false });
-
-/**
- * SLA tracking sub-schema
- */
-const slaSchema = new mongoose.Schema({
-  // SLA deadline based on category
-  deadline: {
-    type: Date,
-  },
-  // SLA hours from category at time of creation
-  targetHours: {
-    type: Number,
-  },
-  // Whether SLA was breached
-  breached: {
-    type: Boolean,
-    default: false,
-  },
-  breachedAt: {
-    type: Date,
-  },
-  // Actual resolution time in hours
-  actualResolutionHours: {
-    type: Number,
-  },
-}, { _id: false });
 
 /**
  * UC Assignment sub-schema
@@ -260,7 +198,6 @@ const complaintSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number], // [longitude, latitude]
-      required: [true, 'Location coordinates are required'],
       validate: {
         validator: function(coords) {
           if (!coords || coords.length !== 2) return false;
@@ -278,9 +215,10 @@ const complaintSchema = new mongoose.Schema({
       type: String,
       trim: true,
     },
-    ward: {
+    uc: {
       type: String,
       trim: true,
+      description: 'UC name or code, can be entered by user or auto-detected',
     },
     pincode: {
       type: String,
@@ -302,23 +240,25 @@ const complaintSchema = new mongoose.Schema({
     default: 'web',
   },
 
-  // UC/Town/City hierarchy references
+  // UC/Town/City hierarchy references (optional, auto-detected from location)
   ucId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'UC',
-    required: [true, 'UC assignment is required'],
+    index: true,
+  },
+  ucNumber: {
+    type: String,
+    trim: true,
     index: true,
   },
   townId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Town',
-    required: [true, 'Town reference is required'],
     index: true,
   },
   cityId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'City',
-    required: [true, 'City reference is required'],
     index: true,
   },
 
@@ -336,29 +276,10 @@ const complaintSchema = new mongoose.Schema({
     },
     history: [statusHistorySchema],
   },
-  severity: {
-    type: severitySchema,
-    default: () => ({}),
-  },
-
-  // SLA tracking
-  sla: {
-    type: slaSchema,
-    default: () => ({}),
-  },
 
   duplicateOf: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Complaint',
-  },
-  linkedComplaints: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Complaint',
-  }],
-
-  resolution: {
-    type: resolutionSchema,
-    default: null,
   },
 
   // Citizen feedback (after closure)
@@ -399,8 +320,6 @@ complaintSchema.index({ 'category.primary': 1 });
 complaintSchema.index({ 'status.current': 1 });
 // Created date for sorting (descending for recent first)
 complaintSchema.index({ createdAt: -1 });
-// Severity score for sorting
-complaintSchema.index({ 'severity.score': -1 });
 // Compound index for UC-status queries
 complaintSchema.index({ ucId: 1, 'status.current': 1 });
 // Compound index for Town-status queries
@@ -411,20 +330,11 @@ complaintSchema.index({ cityId: 1, 'status.current': 1 });
 complaintSchema.index({ 'location.area': 1, 'category.primary': 1 });
 // Text index for search
 complaintSchema.index({ description: 'text', 'location.address': 'text' });
-// Index for SLA breach queries
-complaintSchema.index({ 'sla.breached': 1, 'sla.deadline': 1 });
 // Index for citizen complaints
 complaintSchema.index({ 'citizenInfo.userId': 1 });
-// Index for heatmap profile queries (resolved complaints by entity)
-complaintSchema.index({ 'resolution.resolvedBy': 1, 'status.current': 1 });
 
-// Immutable fields list
+// Immutable fields list (only critical citizen info and location)
 const IMMUTABLE_FIELDS = [
-  'description',
-  'images',
-  'category.primary',
-  'severity.score',
-  'severity.priority',
   'citizenInfo',
   'location.coordinates',
 ];
@@ -451,7 +361,6 @@ complaintSchema.pre('save', async function() {
 
     // Lock immutable fields
     this.immutableFieldsLockedAt = new Date();
-    this.severity.lockedAt = new Date();
   }
 });
 
@@ -514,35 +423,6 @@ complaintSchema.methods.updateStatus = async function(newStatus, updatedBy, upda
     updatedByRole,
     remarks,
   });
-
-  // Handle resolution
-  if (newStatus === 'resolved') {
-    if (!this.resolution) {
-      this.resolution = {};
-    }
-    this.resolution.resolvedAt = new Date();
-    this.resolution.resolvedBy = updatedBy;
-
-    // Calculate actual resolution time for SLA
-    if (this.sla && this.createdAt) {
-      const resolutionHours = (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60);
-      this.sla.actualResolutionHours = Math.round(resolutionHours * 10) / 10;
-      
-      // Check SLA breach
-      if (this.sla.targetHours && resolutionHours > this.sla.targetHours) {
-        this.sla.breached = true;
-        this.sla.breachedAt = this.sla.deadline || new Date();
-      }
-    }
-  }
-
-  // Handle closure
-  if (newStatus === 'closed') {
-    if (!this.resolution) {
-      this.resolution = {};
-    }
-    this.resolution.closedAt = new Date();
-  }
 
   return this.save();
 };
@@ -641,22 +521,6 @@ complaintSchema.statics.findByCity = function(cityId, options = {}) {
 };
 
 /**
- * Static method to find SLA breached complaints
- */
-complaintSchema.statics.findSLABreached = function(entityType, entityId) {
-  const query = {
-    'sla.breached': true,
-    'status.current': { $nin: ['resolved', 'closed', 'citizen_feedback', 'rejected'] },
-  };
-  
-  if (entityType === 'uc') query.ucId = entityId;
-  else if (entityType === 'town') query.townId = entityId;
-  else if (entityType === 'city') query.cityId = entityId;
-  
-  return this.find(query).sort({ 'sla.deadline': 1 });
-};
-
-/**
  * Static method to find complaints near a location
  */
 complaintSchema.statics.findNearby = function(longitude, latitude, maxDistance = 1000) {
@@ -713,29 +577,6 @@ complaintSchema.statics.getStats = async function(filters = {}) {
           { $group: { _id: '$location.area', count: { $sum: 1 } } },
           { $sort: { count: -1 } },
           { $limit: 10 },
-        ],
-        slaBreaches: [
-          { $match: { 'sla.breached': true } },
-          { $count: 'count' },
-        ],
-        avgResolutionTime: [
-          {
-            $match: {
-              'status.current': { $in: ['resolved', 'closed', 'citizen_feedback'] },
-              'resolution.resolvedAt': { $exists: true },
-            },
-          },
-          {
-            $project: {
-              resolutionTime: {
-                $divide: [
-                  { $subtract: ['$resolution.resolvedAt', '$createdAt'] },
-                  3600000,
-                ],
-              },
-            },
-          },
-          { $group: { _id: null, avgTime: { $avg: '$resolutionTime' } } },
         ],
         avgFeedbackRating: [
           {

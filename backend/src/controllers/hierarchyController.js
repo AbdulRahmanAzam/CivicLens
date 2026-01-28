@@ -740,6 +740,223 @@ exports.getNearbyUCs = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc    Assign mayor to city
+ * @route   PATCH /api/v1/hierarchy/cities/:cityId/assign-mayor
+ * @access  Website Admin only
+ */
+exports.assignMayorToCity = asyncHandler(async (req, res, next) => {
+  const { cityId } = req.params;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return next(new ErrorResponse('User ID is required', 400));
+  }
+
+  const city = await City.findById(cityId);
+  if (!city) {
+    return next(new ErrorResponse('City not found', 404));
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new ErrorResponse('User not found', 404));
+  }
+
+  if (user.role !== 'mayor') {
+    return next(new ErrorResponse('User must have mayor role', 400));
+  }
+
+  // Check if user is already assigned to another city
+  if (user.city && user.city.toString() !== cityId) {
+    return next(new ErrorResponse('User is already assigned to another city', 400));
+  }
+
+  // Update city
+  city.mayor = userId;
+  await city.save();
+
+  // Update user
+  user.city = cityId;
+  await user.save();
+
+  // Audit log
+  await AuditLog.logAction({
+    action: 'mayor_assigned',
+    actor: req.user._id,
+    target: { type: 'city', id: city._id },
+    details: { mayorId: userId, mayorName: user.name },
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Mayor assigned to city successfully',
+    data: {
+      city: {
+        id: city._id,
+        name: city.name,
+      },
+      mayor: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    },
+  });
+});
+
+/**
+ * @desc    Assign town chairman to town
+ * @route   PATCH /api/v1/hierarchy/towns/:townId/assign-chairman
+ * @access  Website Admin, Mayor (own city only)
+ */
+exports.assignTownChairman = asyncHandler(async (req, res, next) => {
+  const { townId } = req.params;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return next(new ErrorResponse('User ID is required', 400));
+  }
+
+  const town = await Town.findById(townId).populate('city');
+  if (!town) {
+    return next(new ErrorResponse('Town not found', 404));
+  }
+
+  // Check permissions: mayor can only assign in their city
+  if (req.user.role === 'mayor' && req.user.city?.toString() !== town.city._id.toString()) {
+    return next(new ErrorResponse('Not authorized to assign chairman in this town', 403));
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new ErrorResponse('User not found', 404));
+  }
+
+  if (user.role !== 'town_chairman') {
+    return next(new ErrorResponse('User must have town_chairman role', 400));
+  }
+
+  // Check if user is already assigned to another town
+  if (user.town && user.town.toString() !== townId) {
+    return next(new ErrorResponse('User is already assigned to another town', 400));
+  }
+
+  // Update town
+  town.townChairman = userId;
+  await town.save();
+
+  // Update user
+  user.town = townId;
+  user.city = town.city._id;
+  await user.save();
+
+  // Audit log
+  await AuditLog.logAction({
+    action: 'town_chairman_assigned',
+    actor: req.user._id,
+    target: { type: 'town', id: town._id },
+    details: { chairmanId: userId, chairmanName: user.name },
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Town chairman assigned successfully',
+    data: {
+      town: {
+        id: town._id,
+        name: town.name,
+      },
+      chairman: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    },
+  });
+});
+
+/**
+ * @desc    Assign UC chairman to UC
+ * @route   PATCH /api/v1/hierarchy/ucs/:ucId/assign-chairman
+ * @access  Website Admin, Mayor (own city), Town Chairman (own town)
+ */
+exports.assignUCChairman = asyncHandler(async (req, res, next) => {
+  const { ucId } = req.params;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return next(new ErrorResponse('User ID is required', 400));
+  }
+
+  const uc = await UC.findById(ucId).populate('town city');
+  if (!uc) {
+    return next(new ErrorResponse('UC not found', 404));
+  }
+
+  // Check permissions
+  if (req.user.role === 'mayor' && req.user.city?.toString() !== uc.city._id.toString()) {
+    return next(new ErrorResponse('Not authorized to assign chairman in this UC', 403));
+  }
+  if (req.user.role === 'town_chairman' && req.user.town?.toString() !== uc.town._id.toString()) {
+    return next(new ErrorResponse('Not authorized to assign chairman in this UC', 403));
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(new ErrorResponse('User not found', 404));
+  }
+
+  if (user.role !== 'uc_chairman') {
+    return next(new ErrorResponse('User must have uc_chairman role', 400));
+  }
+
+  // Check if user is already assigned to another UC
+  if (user.uc && user.uc.toString() !== ucId) {
+    return next(new ErrorResponse('User is already assigned to another UC', 400));
+  }
+
+  // Update UC
+  uc.chairman = userId;
+  await uc.save();
+
+  // Update user
+  user.uc = ucId;
+  user.town = uc.town._id;
+  user.city = uc.city._id;
+  await user.save();
+
+  // Audit log
+  await AuditLog.logAction({
+    action: 'uc_chairman_assigned',
+    actor: req.user._id,
+    target: { type: 'uc', id: uc._id },
+    details: { chairmanId: userId, chairmanName: user.name },
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'UC chairman assigned successfully',
+    data: {
+      uc: {
+        id: uc._id,
+        name: uc.name,
+      },
+      chairman: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    },
+  });
+});
+
+/**
  * @desc    Get hierarchy statistics
  * @route   GET /api/hierarchy/stats
  * @access  Website Admin, Mayor

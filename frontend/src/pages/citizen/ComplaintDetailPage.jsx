@@ -148,7 +148,9 @@ const ComplaintDetailPage = () => {
 
       try {
         const response = await complaintsApi.getComplaint(id);
-        setComplaint(response.data.data);
+        // Handle both possible response structures
+        const complaintData = response.data?.data || response.data;
+        setComplaint(complaintData);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch complaint');
       } finally {
@@ -168,7 +170,8 @@ const ComplaintDetailPage = () => {
       await complaintsApi.addComment(id, { comment });
       // Refresh complaint
       const response = await complaintsApi.getComplaint(id);
-      setComplaint(response.data.data);
+      const complaintData = response.data?.data || response.data;
+      setComplaint(complaintData);
       setComment('');
       setCommentModal(false);
     } catch (err) {

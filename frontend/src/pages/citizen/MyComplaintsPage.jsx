@@ -144,20 +144,22 @@ const MyComplaintsPage = () => {
       const params = {
         page: pagination.page,
         limit: pagination.limit,
-        mineOnly: true,
       };
 
       if (statusFilter) params.status = statusFilter;
       if (searchQuery) params.search = searchQuery;
 
-      const response = await complaintsApi.getComplaints(params);
+      // Use the dedicated getMyComplaints endpoint
+      const response = await complaintsApi.getMyComplaints(params);
       const data = response.data;
 
-      setComplaints(data.data || []);
+      // Handle both possible response structures
+      const complaintsData = data?.complaints || data?.data || data || [];
+      setComplaints(Array.isArray(complaintsData) ? complaintsData : []);
       setPagination(prev => ({
         ...prev,
-        total: data.total || 0,
-        totalPages: data.totalPages || 1,
+        total: data?.pagination?.totalItems || data?.total || complaintsData.length || 0,
+        totalPages: data?.pagination?.totalPages || data?.totalPages || 1,
       }));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch complaints');

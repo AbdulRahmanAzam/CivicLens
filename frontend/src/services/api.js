@@ -237,6 +237,41 @@ export const authApi = {
     const response = await api.delete(`/auth/users/${id}`);
     return response.data;
   },
+
+  /**
+   * Delete own account (requires password)
+   */
+  deleteMe: async (password) => {
+    const response = await api.delete('/auth/me', { data: { password } });
+    return response.data;
+  },
+
+  /**
+   * Alias for deleteMe for backward compatibility
+   */
+  deleteAccount: async (password) => {
+    return authApi.deleteMe(password);
+  },
+
+  /**
+   * Update user settings (notifications, privacy)
+   * Note: This uses the updateProfile endpoint
+   */
+  updateSettings: async (settings) => {
+    const response = await api.patch('/auth/me', settings);
+    return response.data;
+  },
+
+  /**
+   * Update user avatar
+   * Note: Uses the updateProfile endpoint with multipart form data
+   */
+  updateAvatar: async (formData) => {
+    const response = await api.patch('/auth/me', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 /**
@@ -363,6 +398,55 @@ export const complaintsApi = {
    */
   updateStatus: async (id, status, notes = '') => {
     const response = await api.patch(`/complaints/${id}/status`, { status, notes });
+    return response.data;
+  },
+
+  /**
+   * Get current user's complaints
+   * @param {Object} params - Pagination and filter params
+   * @returns {Promise} - User's complaints
+   */
+  getMyComplaints: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.search) queryParams.append('search', params.search);
+    
+    const response = await api.get(`/complaints/my?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Alias for getComplaintById for backward compatibility
+   * @param {string} id - Complaint ID
+   * @returns {Promise} - Single complaint object
+   */
+  getComplaint: async (id) => {
+    const response = await api.get(`/complaints/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Add comment to complaint
+   * Note: Backend might not support this yet - placeholder
+   * @param {string} id - Complaint ID
+   * @param {Object} data - Comment data
+   * @returns {Promise} - Updated complaint
+   */
+  addComment: async (id, data) => {
+    const response = await api.post(`/complaints/${id}/comments`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete complaint (citizen can delete own pending complaints)
+   * Note: Backend might not support this yet - placeholder
+   * @param {string} id - Complaint ID
+   * @returns {Promise} - Success response
+   */
+  deleteComplaint: async (id) => {
+    const response = await api.delete(`/complaints/${id}`);
     return response.data;
   },
 };
@@ -610,6 +694,273 @@ export const whatsappApi = {
    */
   sendLocationLink: async (phoneNumber) => {
     const response = await api.post('/whatsapp/send-location-link', { phoneNumber });
+    return response.data;
+  },
+};
+
+/**
+ * Hierarchy API endpoints
+ */
+export const hierarchyApi = {
+  /**
+   * Find UC by coordinates (geo-fencing)
+   * @param {number} longitude - Longitude coordinate
+   * @param {number} latitude - Latitude coordinate
+   * @returns {Promise} - UC assignment info with confidence
+   */
+  findUCByLocation: async (longitude, latitude) => {
+    const response = await api.post('/hierarchy/find-uc', { longitude, latitude });
+    return response.data;
+  },
+
+  /**
+   * Get all UCs
+   * @returns {Promise} - Array of UCs
+   */
+  getUCs: async () => {
+    const response = await api.get('/hierarchy/ucs');
+    return response.data;
+  },
+
+  /**
+   * Get all Towns
+   * @returns {Promise} - Array of Towns
+   */
+  getTowns: async () => {
+    const response = await api.get('/hierarchy/towns');
+    return response.data;
+  },
+
+  /**
+   * Get all Cities
+   * @returns {Promise} - Array of Cities
+   */
+  getCities: async () => {
+    const response = await api.get('/hierarchy/cities');
+    return response.data;
+  },
+
+  /**
+   * Get UC by ID
+   * @param {string} id - UC ID
+   * @returns {Promise} - UC details
+   */
+  getUC: async (id) => {
+    const response = await api.get(`/hierarchy/ucs/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Get Town by ID
+   * @param {string} id - Town ID
+   * @returns {Promise} - Town details
+   */
+  getTown: async (id) => {
+    const response = await api.get(`/hierarchy/towns/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Get City by ID
+   * @param {string} id - City ID
+   * @returns {Promise} - City details
+   */
+  getCity: async (id) => {
+    const response = await api.get(`/hierarchy/cities/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Get hierarchy tree
+   * @param {string} cityId - Optional city ID filter
+   * @returns {Promise} - Hierarchy tree
+   */
+  getHierarchyTree: async (cityId = null) => {
+    const url = cityId ? `/hierarchy/tree?cityId=${cityId}` : '/hierarchy/tree';
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  /**
+   * Get UCs in a town
+   * @param {string} townId - Town ID
+   * @returns {Promise} - Array of UCs
+   */
+  getUCsByTown: async (townId) => {
+    const response = await api.get(`/hierarchy/towns/${townId}/ucs`);
+    return response.data;
+  },
+
+  /**
+   * Get Towns in a city
+   * @param {string} cityId - City ID
+   * @returns {Promise} - Array of Towns
+   */
+  getTownsByCity: async (cityId) => {
+    const response = await api.get(`/hierarchy/cities/${cityId}/towns`);
+    return response.data;
+  },
+
+  /**
+   * Assign mayor to city
+   * @param {string} cityId - City ID
+   * @param {string} userId - User ID (must be mayor role)
+   * @returns {Promise} - Assignment result
+   */
+  assignMayorToCity: async (cityId, userId) => {
+    const response = await api.patch(`/hierarchy/cities/${cityId}/assign-mayor`, { userId });
+    return response.data;
+  },
+
+  /**
+   * Assign town chairman to town
+   * @param {string} townId - Town ID
+   * @param {string} userId - User ID (must be town_chairman role)
+   * @returns {Promise} - Assignment result
+   */
+  assignTownChairman: async (townId, userId) => {
+    const response = await api.patch(`/hierarchy/towns/${townId}/assign-chairman`, { userId });
+    return response.data;
+  },
+
+  /**
+   * Assign UC chairman to UC
+   * @param {string} ucId - UC ID
+   * @param {string} userId - User ID (must be uc_chairman role)
+   * @returns {Promise} - Assignment result
+   */
+  assignUCChairman: async (ucId, userId) => {
+    const response = await api.patch(`/hierarchy/ucs/${ucId}/assign-chairman`, { userId });
+    return response.data;
+  },
+};
+
+/**
+ * Analytics API endpoints
+ */
+export const analyticsApi = {
+  /**
+   * Get UC-level analytics
+   * @param {string} ucId - UC ID
+   * @param {number} days - Number of days to analyze (default: 30)
+   * @returns {Promise} - UC analytics data
+   */
+  getUCAnalytics: async (ucId, days = 30) => {
+    const response = await api.get(`/analytics/uc/${ucId}?days=${days}`);
+    return response.data;
+  },
+
+  /**
+   * Get Town-level analytics
+   * @param {string} townId - Town ID
+   * @param {number} days - Number of days to analyze (default: 30)
+   * @returns {Promise} - Town analytics data
+   */
+  getTownAnalytics: async (townId, days = 30) => {
+    const response = await api.get(`/analytics/town/${townId}?days=${days}`);
+    return response.data;
+  },
+
+  /**
+   * Get City-level analytics
+   * @param {string} cityId - City ID
+   * @param {number} days - Number of days to analyze (default: 30)
+   * @returns {Promise} - City analytics data
+   */
+  getCityAnalytics: async (cityId, days = 30) => {
+    const response = await api.get(`/analytics/city/${cityId}?days=${days}`);
+    return response.data;
+  },
+
+  /**
+   * Get System-wide analytics (website_admin only)
+   * @param {number} days - Number of days to analyze (default: 30)
+   * @returns {Promise} - System analytics data
+   */
+  getSystemAnalytics: async (days = 30) => {
+    const response = await api.get(`/analytics/system?days=${days}`);
+    return response.data;
+  },
+
+  /**
+   * Get SLA performance report
+   * @returns {Promise} - SLA performance data
+   */
+  getSLAPerformance: async () => {
+    const response = await api.get('/analytics/sla-performance');
+    return response.data;
+  },
+};
+
+/**
+ * Invitation API endpoints
+ */
+export const invitationApi = {
+  /**
+   * Create a new invitation
+   * @param {Object} data - Invitation data { email, role, targetEntityId }
+   * @returns {Promise} - Invitation result with token
+   */
+  createInvitation: async (data) => {
+    const response = await api.post('/invitations', data);
+    return response.data;
+  },
+
+  /**
+   * Get all pending invitations
+   * @returns {Promise} - Array of pending invitations
+   */
+  getPendingInvitations: async () => {
+    const response = await api.get('/invitations');
+    return response.data;
+  },
+
+  /**
+   * Validate an invitation token
+   * @param {string} token - Invitation token
+   * @returns {Promise} - Validation result
+   */
+  validateToken: async (token) => {
+    const response = await api.get(`/invitations/validate/${token}`);
+    return response.data;
+  },
+
+  /**
+   * Accept invitation and register
+   * @param {Object} data - Registration data with token
+   * @returns {Promise} - User registration result
+   */
+  acceptInvitation: async (data) => {
+    const response = await api.post('/invitations/accept', data);
+    return response.data;
+  },
+
+  /**
+   * Revoke an invitation
+   * @param {string} id - Invitation ID
+   * @returns {Promise} - Revocation result
+   */
+  revokeInvitation: async (id) => {
+    const response = await api.delete(`/invitations/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Resend an invitation
+   * @param {string} id - Invitation ID
+   * @returns {Promise} - Resend result
+   */
+  resendInvitation: async (id) => {
+    const response = await api.post(`/invitations/${id}/resend`);
+    return response.data;
+  },
+
+  /**
+   * Get invitation statistics (admin only)
+   * @returns {Promise} - Invitation stats
+   */
+  getStats: async () => {
+    const response = await api.get('/invitations/stats');
     return response.data;
   },
 };

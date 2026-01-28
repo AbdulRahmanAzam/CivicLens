@@ -1,5 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { complaintsApi, analyticsApi, invitationApi, hierarchyApi } from '../../services/api';
+import { toast } from 'react-hot-toast';
 
 // Icons
 const Icons = {
@@ -55,29 +58,51 @@ const Icons = {
   ),
 };
 
-const issueSeed = [
-  { id: 'TS-4021', title: 'Water leak near 3rd Street', status: 'In progress', category: 'Utilities', reportedOn: 'Jan 23, 2026', priority: 'high', uc: 'UC-12' },
-  { id: 'TS-3989', title: 'Broken sidewalk tiles', status: 'In review', category: 'Infrastructure', reportedOn: 'Jan 19, 2026', priority: 'medium', uc: 'UC-08' },
-  { id: 'TS-3920', title: 'Noise complaint at night market', status: 'Resolved', category: 'Public Safety', reportedOn: 'Jan 12, 2026', priority: 'low', uc: 'UC-05' },
-];
-
-const feedbackSeed = [
-  { id: 'TFB-03', issueId: 'TS-3920', citizen: 'Hassan R.', rating: 'Satisfied', message: 'The enforcement team responded quickly.', date: 'Jan 25, 2026' },
-  { id: 'TFB-02', issueId: 'TS-3888', citizen: 'Zara M.', rating: 'Neutral', message: 'Issue resolved but took longer than expected.', date: 'Jan 22, 2026' },
-];
-
-const quickStats = [
-  { label: 'Active Issues', value: '24', change: '+5 this week', color: 'primary' },
-  { label: 'Resolved', value: '156', change: '12 this month', color: 'secondary' },
-  { label: 'UC Chairmen', value: '8', change: 'All active', color: 'blue' },
-  { label: 'Avg. Resolution', value: '3.2d', change: '-0.5 days', color: 'amber' },
-];
-
 const TownshipDashboard = () => {
+  const { user } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
-  const [issues] = useState(issueSeed);
-  const [chairmanForm, setChairmanForm] = useState({ fullName: '', email: '', phone: '', unionCouncil: '' });
+  const [issues, setIssues] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [ucs, setUCs] = useState([]);
+  
+  const [chairmanForm, setChairmanForm] = useState({ email: '', ucId: '' });
   const [chairmanSuccess, setChairmanSuccess] = useState(false);
+
+  // Fetch town-wide data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.town) {
+        toast.error('No town assigned to your account');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Fetch complaints for the town
+        const complaintsRes = await complaintsApi.getAll({ townId: user.town });
+        setIssues(complaintsRes.data || []);
+
+        // Fetch town analytics
+        const analyticsRes = await analyticsApi.getTownAnalytics(user.town, 30);
+        setAnalytics(analyticsRes.data);
+
+        // Fetch UCs in the town
+        const ucsRes = await hierarchyApi.getUCsByTown(user.town);
+        setUCs(ucsRes.data || []);
+
+      } catch (error) {
+        console.error('Failed to fetch town dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
 
   const operations = useMemo(() => [
     { id: 'browse', label: 'Browse Issues', description: 'Monitor township reports', icon: Icons.Browse },
@@ -87,19 +112,44 @@ const TownshipDashboard = () => {
 
   const handleChairmanChange = (e) => setChairmanForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handleChairmanSubmit = (e) => {
+  const handleChairmanSubmit = async (e) => {
     e.preventDefault();
-    setChairmanSuccess(true);
-    setChairmanForm({ fullName: '', email: '', phone: '', unionCouncil: '' });
-    setTimeout(() => setChairmanSuccess(false), 3000);
+    try {
+      await invitationApi.createInvitation({
+        email: chairmanForm.email,
+        role: 'uc_chairman',
+        targetEntityId: chairmanForm.ucId,
+      });
+      
+      setChairmanSuccess(true);
+      setChairmanForm({ email: '', ucId: '' });
+      toast.success('UC chairman invitation sent!');
+      setTimeout(() => setChairmanSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to send UC chairman invitation:', error);
+      toast.error(error.response?.data?.message || 'Failed to send invitation');
+    }
   };
 
   const getStatusStyles = (status) => {
-    switch (status.toLowerCase()) {
-      case 'resolved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'in progress': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'in review': return 'bg-amber-50 text-amber-700 border-amber-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+    const statusLower = (status || '').toLowerCase();
+    switch (statusLower) {
+      case 'resolved':
+      case 'closed':
+      case 'citizen_feedback':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'in_progress':
+      case 'in progress':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'acknowledged':
+      case 'in review':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'submitted':
+        return 'bg-gray-50 text-gray-700 border-gray-200';
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -137,25 +187,65 @@ const TownshipDashboard = () => {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {quickStats.map((stat, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-3">
-              <div className={`p-2 rounded-xl ${stat.color === 'primary' ? 'bg-primary/10 text-primary' : stat.color === 'secondary' ? 'bg-secondary/10 text-secondary' : stat.color === 'blue' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                {stat.color === 'primary' ? <Icons.Browse /> : stat.color === 'secondary' ? <Icons.Check /> : stat.color === 'blue' ? <Icons.Users /> : <Icons.Clock />}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Icons.Browse />
+                </div>
+                <Icons.TrendingUp />
               </div>
-              <Icons.TrendingUp />
+              <p className="text-2xl font-bold text-foreground">{analytics?.summary?.totalComplaints || 0}</p>
+              <p className="text-sm font-medium text-foreground/70">Active Issues</p>
+              <p className="text-xs text-foreground/50 mt-1">Last 30 days</p>
             </div>
-            <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-            <p className="text-sm font-medium text-foreground/70">{stat.label}</p>
-            <p className="text-xs text-foreground/50 mt-1">{stat.change}</p>
-          </div>
-        ))}
-      </div>
 
-      {/* Operation Tabs */}
-      <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-secondary/10 text-secondary">
+                  <Icons.Check />
+                </div>
+                <Icons.TrendingUp />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{analytics?.summary?.resolvedCount || 0}</p>
+              <p className="text-sm font-medium text-foreground/70">Resolved</p>
+              <p className="text-xs text-foreground/50 mt-1">Last 30 days</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-blue-100 text-blue-600">
+                  <Icons.Users />
+                </div>
+                <Icons.TrendingUp />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{ucs.length || 0}</p>
+              <p className="text-sm font-medium text-foreground/70">Union Councils</p>
+              <p className="text-xs text-foreground/50 mt-1">In township</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-600">
+                  <Icons.Clock />
+                </div>
+                <Icons.TrendingUp />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{analytics?.summary?.avgResolutionHours ? `${Math.round(analytics.summary.avgResolutionHours / 24)}d` : 'N/A'}</p>
+              <p className="text-sm font-medium text-foreground/70">Avg. Resolution</p>
+              <p className="text-xs text-foreground/50 mt-1">Average time</p>
+            </div>
+          </div>
+
+          {/* Operation Tabs */}
+          <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
         {operations.map((op) => (
           <button key={op.id} onClick={() => setActiveOperation(op.id)} className={`flex items-center gap-3 px-5 py-3 rounded-xl border-2 transition-all duration-200 min-w-fit ${activeOperation === op.id ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25' : 'bg-white border-foreground/10 hover:border-primary/30 hover:bg-primary/5'}`}>
             <div className={`p-1.5 rounded-lg ${activeOperation === op.id ? 'bg-white/20' : 'bg-primary/10'}`}><op.icon /></div>
@@ -265,39 +355,18 @@ const TownshipDashboard = () => {
                 <div className="p-2.5 rounded-xl bg-secondary/10 text-secondary"><Icons.Feedback /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">Citizen Feedback</h3>
-                  <p className="text-sm text-foreground/60">Monitor satisfaction on resolved issues</p>
+                  <p className="text-sm text-foreground/60">Monitor satisfaction on resolved issues - Coming soon</p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-sm font-medium">
-                <Icons.Star />{feedbackSeed.length} new
               </div>
             </div>
           </div>
-          <div className="p-4 space-y-3">
-            {feedbackSeed.map((fb) => {
-              const ratingStyle = getRatingStyles(fb.rating);
-              return (
-                <div key={fb.id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center">{fb.citizen.charAt(0)}</div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{fb.citizen}</p>
-                        <p className="text-xs text-foreground/50">Issue {fb.issueId}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-lg`}>{ratingStyle.emoji}</span>
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ratingStyle.bg} ${ratingStyle.text}`}>{fb.rating}</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-foreground/80 bg-foreground/[0.02] rounded-lg p-3 border border-foreground/5">"{fb.message}"</p>
-                  <p className="text-xs text-foreground/40 mt-2 flex items-center gap-1"><Icons.Clock />{fb.date}</p>
-                </div>
-              );
-            })}
+          <div className="p-8 text-center">
+            <p className="text-foreground/60">Feedback monitoring feature will be available soon</p>
+            <p className="text-sm text-foreground/50 mt-2">Average citizen rating: {analytics?.summary?.avgCitizenRating || 'N/A'}</p>
           </div>
         </section>
+      )}
+        </>
       )}
     </div>
   );

@@ -1,5 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { complaintsApi, analyticsApi, invitationApi, hierarchyApi } from '../../services/api';
+import { toast } from 'react-hot-toast';
 
 // Icons
 const Icons = {
@@ -65,31 +68,71 @@ const Icons = {
   ),
 };
 
-const issueSeed = [
-  { id: 'CL-2045', title: 'Drainage overflow near Market Road', status: 'In progress', category: 'Utilities', reportedOn: 'Jan 22, 2026', priority: 'high', township: 'Gulshan' },
-  { id: 'CL-2011', title: 'School zone crossing signals needed', status: 'In review', category: 'Public Safety', reportedOn: 'Jan 16, 2026', priority: 'high', township: 'Clifton' },
-  { id: 'CL-1996', title: 'Illegal dumping reported behind Stadium', status: 'Resolved', category: 'Sanitation', reportedOn: 'Jan 10, 2026', priority: 'medium', township: 'Saddar' },
-];
-
-const feedbackSeed = [
-  { id: 'FDB-09', issueId: 'CL-1996', citizen: 'Ayesha K.', rating: 'Satisfied', message: 'Cleanup was prompt and thorough. Thank you.', date: 'Jan 24, 2026' },
-  { id: 'FDB-08', issueId: 'CL-1952', citizen: 'Imran S.', rating: 'Neutral', message: 'Resolved but communication could improve.', date: 'Jan 21, 2026' },
-];
-
-const quickStats = [
-  { label: 'Citywide Issues', value: '89', change: '+12 this week', color: 'primary' },
-  { label: 'Resolved', value: '412', change: '34 this month', color: 'secondary' },
-  { label: 'Townships', value: '18', change: 'All reporting', color: 'purple' },
-  { label: 'Satisfaction', value: '94%', change: '+2% from last', color: 'amber' },
-];
-
 const MayorDashboard = () => {
+  const { user } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
-  const [issues] = useState(issueSeed);
-  const [townshipForm, setTownshipForm] = useState({ fullName: '', email: '', phone: '', township: '' });
-  const [chairmanForm, setChairmanForm] = useState({ fullName: '', email: '', phone: '', unionCouncil: '' });
+  const [issues, setIssues] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [towns, setTowns] = useState([]);
+  const [ucs, setUCs] = useState([]);
+  
+  const [townshipForm, setTownshipForm] = useState({ email: '', townId: '' });
+  const [chairmanForm, setChairmanForm] = useState({ email: '', ucId: '' });
   const [townshipSuccess, setTownshipSuccess] = useState(false);
   const [chairmanSuccess, setChairmanSuccess] = useState(false);
+
+  // Fetch city-wide data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.city) {
+        toast.error('No city assigned to your account');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Fetch complaints for the city
+        const complaintsRes = await complaintsApi.getAll({ cityId: user.city });
+        setIssues(complaintsRes.data || []);
+
+        // Fetch city analytics
+        const analyticsRes = await analyticsApi.getCityAnalytics(user.city, 30);
+        setAnalytics(analyticsRes.data);
+
+        // Fetch towns in the city
+        const townsRes = await hierarchyApi.getTownsByCity(user.city);
+        setTowns(townsRes.data || []);
+
+      } catch (error) {
+        console.error('Failed to fetch mayor dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  // Fetch UCs when a town is selected for UC chairman invitation
+  useEffect(() => {
+    const fetchUCs = async () => {
+      if (chairmanForm.townId) {
+        try {
+          const ucsRes = await hierarchyApi.getUCsByTown(chairmanForm.townId);
+          setUCs(ucsRes.data || []);
+        } catch (error) {
+          console.error('Failed to fetch UCs:', error);
+          toast.error('Failed to load UCs');
+        }
+      }
+    };
+
+    fetchUCs();
+  }, [chairmanForm.townId]);
 
   const operations = useMemo(() => [
     { id: 'browse', label: 'Browse Issues', description: 'Citywide reports overview', icon: Icons.Browse },
@@ -101,26 +144,63 @@ const MayorDashboard = () => {
   const handleTownshipChange = (e) => setTownshipForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   const handleChairmanChange = (e) => setChairmanForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handleTownshipSubmit = (e) => {
+  const handleTownshipSubmit = async (e) => {
     e.preventDefault();
-    setTownshipSuccess(true);
-    setTownshipForm({ fullName: '', email: '', phone: '', township: '' });
-    setTimeout(() => setTownshipSuccess(false), 3000);
+    try {
+      await invitationApi.createInvitation({
+        email: townshipForm.email,
+        role: 'town_chairman',
+        targetEntityId: townshipForm.townId,
+      });
+      
+      setTownshipSuccess(true);
+      setTownshipForm({ email: '', townId: '' });
+      toast.success('Township head invitation sent!');
+      setTimeout(() => setTownshipSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to send township invitation:', error);
+      toast.error(error.response?.data?.message || 'Failed to send invitation');
+    }
   };
 
-  const handleChairmanSubmit = (e) => {
+  const handleChairmanSubmit = async (e) => {
     e.preventDefault();
-    setChairmanSuccess(true);
-    setChairmanForm({ fullName: '', email: '', phone: '', unionCouncil: '' });
-    setTimeout(() => setChairmanSuccess(false), 3000);
+    try {
+      await invitationApi.createInvitation({
+        email: chairmanForm.email,
+        role: 'uc_chairman',
+        targetEntityId: chairmanForm.ucId,
+      });
+      
+      setChairmanSuccess(true);
+      setChairmanForm({ email: '', ucId: '', townId: '' });
+      toast.success('UC chairman invitation sent!');
+      setTimeout(() => setChairmanSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to send UC chairman invitation:', error);
+      toast.error(error.response?.data?.message || 'Failed to send invitation');
+    }
   };
 
   const getStatusStyles = (status) => {
-    switch (status.toLowerCase()) {
-      case 'resolved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'in progress': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'in review': return 'bg-amber-50 text-amber-700 border-amber-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+    const statusLower = (status || '').toLowerCase();
+    switch (statusLower) {
+      case 'resolved':
+      case 'closed':
+      case 'citizen_feedback':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'in_progress':
+      case 'in progress':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'acknowledged':
+      case 'in review':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'submitted':
+        return 'bg-gray-50 text-gray-700 border-gray-200';
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -158,22 +238,62 @@ const MayorDashboard = () => {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {quickStats.map((stat, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
-            <div className="flex items-start justify-between mb-3">
-              <div className={`p-2 rounded-xl ${stat.color === 'primary' ? 'bg-primary/10 text-primary' : stat.color === 'secondary' ? 'bg-secondary/10 text-secondary' : stat.color === 'purple' ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'}`}>
-                {stat.color === 'primary' ? <Icons.Globe /> : stat.color === 'secondary' ? <Icons.Check /> : stat.color === 'purple' ? <Icons.Building /> : <Icons.Star />}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Icons.Globe />
+                </div>
+                <Icons.TrendingUp />
               </div>
-              <Icons.TrendingUp />
+              <p className="text-2xl font-bold text-foreground">{analytics?.summary?.totalComplaints || 0}</p>
+              <p className="text-sm font-medium text-foreground/70">Citywide Issues</p>
+              <p className="text-xs text-foreground/50 mt-1">Last 30 days</p>
             </div>
-            <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-            <p className="text-sm font-medium text-foreground/70">{stat.label}</p>
-            <p className="text-xs text-foreground/50 mt-1">{stat.change}</p>
+
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-secondary/10 text-secondary">
+                  <Icons.Check />
+                </div>
+                <Icons.TrendingUp />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{analytics?.summary?.resolvedCount || 0}</p>
+              <p className="text-sm font-medium text-foreground/70">Resolved</p>
+              <p className="text-xs text-foreground/50 mt-1">Last 30 days</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-purple-100 text-purple-600">
+                  <Icons.Building />
+                </div>
+                <Icons.TrendingUp />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{towns.length || 0}</p>
+              <p className="text-sm font-medium text-foreground/70">Townships</p>
+              <p className="text-xs text-foreground/50 mt-1">All reporting</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-foreground/10 p-4 hover:shadow-lg transition-all duration-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-600">
+                  <Icons.Star />
+                </div>
+                <Icons.TrendingUp />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{analytics?.summary?.avgCitizenRating || 'N/A'}</p>
+              <p className="text-sm font-medium text-foreground/70">Satisfaction</p>
+              <p className="text-xs text-foreground/50 mt-1">Average rating</p>
+            </div>
           </div>
-        ))}
-      </div>
 
       {/* Operation Tabs */}
       <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
@@ -188,184 +308,217 @@ const MayorDashboard = () => {
         ))}
       </div>
 
-      {/* Browse Issues */}
-      {activeOperation === 'browse' && (
-        <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-6 py-5 border-b border-foreground/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary"><Icons.Browse /></div>
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground">Citywide Issues</h3>
-                  <p className="text-sm text-foreground/60">Review and prioritize response teams across all townships</p>
-                </div>
-              </div>
-              <div className="px-3 py-1.5 rounded-full bg-foreground/5 text-sm font-medium text-foreground/70">{issues.length} priority</div>
-            </div>
-          </div>
-          <div className="p-4 space-y-3">
-            {issues.map((issue) => (
-              <div key={issue.id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group">
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className={`w-2 h-2 rounded-full ${getPriorityDot(issue.priority)}`}></span>
-                      <span className="text-xs font-mono text-foreground/50">{issue.id}</span>
-                      <span className="text-xs text-foreground/40">•</span>
-                      <span className="text-xs text-foreground/50">{issue.category}</span>
-                      <span className="text-xs text-foreground/40">•</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">{issue.township}</span>
-                    </div>
-                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{issue.title}</p>
-                    <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1"><Icons.Clock />Reported {issue.reportedOn}</p>
-                  </div>
+          {/* Browse Issues */}
+          {activeOperation === 'browse' && (
+            <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
+              <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-6 py-5 border-b border-foreground/10">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status)}`}>{issue.status}</span>
-                    <button className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-primary transition-colors"><Icons.ArrowRight /></button>
+                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary"><Icons.Browse /></div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">Citywide Issues</h3>
+                      <p className="text-sm text-foreground/60">Review and prioritize response teams across all townships</p>
+                    </div>
                   </div>
+                  <div className="px-3 py-1.5 rounded-full bg-foreground/5 text-sm font-medium text-foreground/70">{issues.length} total</div>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Register Township Head */}
-      {activeOperation === 'register-township' && (
-        <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-purple-50 to-primary/5 px-6 py-5 border-b border-foreground/10">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-purple-100 text-purple-600"><Icons.Building /></div>
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Register Township Head</h3>
-                <p className="text-sm text-foreground/60">Create accounts for township-level leadership</p>
-              </div>
-            </div>
-          </div>
-          <form onSubmit={handleTownshipSubmit} className="p-6 space-y-5">
-            <div className="grid md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Full Name</label>
-                <input type="text" name="fullName" value={townshipForm.fullName} onChange={handleTownshipChange} placeholder="Township head name" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Township</label>
-                <input type="text" name="township" value={townshipForm.township} onChange={handleTownshipChange} placeholder="Township name" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required />
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Official Email</label>
-                <input type="email" name="email" value={townshipForm.email} onChange={handleTownshipChange} placeholder="head@township.gov" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Phone Number</label>
-                <input type="tel" name="phone" value={townshipForm.phone} onChange={handleTownshipChange} placeholder="+92 3XX XXXXXXX" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" />
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-              <p className="text-xs text-foreground/50">Township heads will receive credentials via email</p>
-              <button type="submit" className="px-8 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm hover:shadow-lg hover:shadow-primary/25 flex items-center gap-2">Register Head<Icons.ArrowRight /></button>
-            </div>
-          </form>
-          {townshipSuccess && (
-            <div className="mx-6 mb-6 rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
-              <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
-              <div><p className="text-sm font-semibold text-foreground">Township head registered!</p><p className="text-xs text-foreground/60">Invitation dispatched</p></div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Register UC Chairman */}
-      {activeOperation === 'register-uc' && (
-        <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-blue-50 to-primary/5 px-6 py-5 border-b border-foreground/10">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-blue-100 text-blue-600"><Icons.UserPlus /></div>
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Register UC Chairman</h3>
-                <p className="text-sm text-foreground/60">Onboard union council leadership</p>
-              </div>
-            </div>
-          </div>
-          <form onSubmit={handleChairmanSubmit} className="p-6 space-y-5">
-            <div className="grid md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Full Name</label>
-                <input type="text" name="fullName" value={chairmanForm.fullName} onChange={handleChairmanChange} placeholder="UC chairman name" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Union Council</label>
-                <input type="text" name="unionCouncil" value={chairmanForm.unionCouncil} onChange={handleChairmanChange} placeholder="UC name or number" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required />
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Official Email</label>
-                <input type="email" name="email" value={chairmanForm.email} onChange={handleChairmanChange} placeholder="chairman@uc.gov" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Phone Number</label>
-                <input type="tel" name="phone" value={chairmanForm.phone} onChange={handleChairmanChange} placeholder="+92 3XX XXXXXXX" className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" />
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-              <p className="text-xs text-foreground/50">Chairmen receive access to neighborhood dashboards</p>
-              <button type="submit" className="px-8 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm hover:shadow-lg hover:shadow-primary/25 flex items-center gap-2">Register Chairman<Icons.ArrowRight /></button>
-            </div>
-          </form>
-          {chairmanSuccess && (
-            <div className="mx-6 mb-6 rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
-              <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
-              <div><p className="text-sm font-semibold text-foreground">UC chairman registered!</p><p className="text-xs text-foreground/60">Credentials dispatched</p></div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Citizen Feedback */}
-      {activeOperation === 'feedback' && (
-        <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-secondary/5 to-primary/5 px-6 py-5 border-b border-foreground/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-secondary/10 text-secondary"><Icons.Feedback /></div>
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground">Citizen Feedback</h3>
-                  <p className="text-sm text-foreground/60">Citywide satisfaction monitoring</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-sm font-medium">
-                <Icons.Star />{feedbackSeed.length} new
-              </div>
-            </div>
-          </div>
-          <div className="p-4 space-y-3">
-            {feedbackSeed.map((fb) => {
-              const ratingStyle = getRatingStyles(fb.rating);
-              return (
-                <div key={fb.id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center">{fb.citizen.charAt(0)}</div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{fb.citizen}</p>
-                        <p className="text-xs text-foreground/50">Issue {fb.issueId}</p>
+              <div className="p-4 space-y-3">
+                {issues.length === 0 ? (
+                  <p className="text-center text-foreground/60 py-8">No complaints found</p>
+                ) : (
+                  issues.slice(0, 10).map((issue) => (
+                    <div key={issue._id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group">
+                      <div className="flex flex-col md:flex-row md:items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-xs font-mono text-foreground/50">{issue._id?.substring(0, 8) || 'N/A'}</span>
+                            <span className="text-xs text-foreground/40">•</span>
+                            <span className="text-xs text-foreground/50">{issue.category?.primary || 'Uncategorized'}</span>
+                            {issue.townName && (
+                              <>
+                                <span className="text-xs text-foreground/40">•</span>
+                                <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">{issue.townName}</span>
+                              </>
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{issue.description?.substring(0, 100) || 'No description'}</p>
+                          <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1">
+                            <Icons.Clock />
+                            Reported {new Date(issue.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status?.current || 'submitted')}`}>
+                            {issue.status?.current || 'Submitted'}
+                          </span>
+                          <button className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-primary transition-colors"><Icons.ArrowRight /></button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-lg`}>{ratingStyle.emoji}</span>
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ratingStyle.bg} ${ratingStyle.text}`}>{fb.rating}</span>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Register Township Head */}
+          {activeOperation === 'register-township' && (
+            <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
+              <div className="bg-gradient-to-r from-purple-50 to-primary/5 px-6 py-5 border-b border-foreground/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-purple-100 text-purple-600"><Icons.Building /></div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Invite Township Head</h3>
+                    <p className="text-sm text-foreground/60">Send invitation to town chairman via email</p>
+                  </div>
+                </div>
+              </div>
+              <form onSubmit={handleTownshipSubmit} className="p-6 space-y-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Township *</label>
+                  <select 
+                    name="townId" 
+                    value={townshipForm.townId} 
+                    onChange={handleTownshipChange} 
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" 
+                    required
+                  >
+                    <option value="">Select township...</option>
+                    {towns.map((town) => (
+                      <option key={town._id} value={town._id}>{town.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Official Email *</label>
+                  <input 
+                    type="email" 
+                    name="email" 
+                    value={townshipForm.email} 
+                    onChange={handleTownshipChange} 
+                    placeholder="head@township.gov" 
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" 
+                    required 
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+                  <p className="text-xs text-foreground/50">Township head will receive invitation and registration link via email</p>
+                  <button type="submit" className="px-8 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm hover:shadow-lg hover:shadow-primary/25 flex items-center gap-2">
+                    Send Invitation<Icons.ArrowRight />
+                  </button>
+                </div>
+              </form>
+              {townshipSuccess && (
+                <div className="mx-6 mb-6 rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
+                  <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
+                  <div><p className="text-sm font-semibold text-foreground">Township head invited!</p><p className="text-xs text-foreground/60">Invitation email sent</p></div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Register UC Chairman */}
+          {activeOperation === 'register-uc' && (
+            <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
+              <div className="bg-gradient-to-r from-blue-50 to-primary/5 px-6 py-5 border-b border-foreground/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-100 text-blue-600"><Icons.UserPlus /></div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Invite UC Chairman</h3>
+                    <p className="text-sm text-foreground/60">Send invitation to union council chairman via email</p>
+                  </div>
+                </div>
+              </div>
+              <form onSubmit={handleChairmanSubmit} className="p-6 space-y-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Town *</label>
+                  <select 
+                    name="townId" 
+                    value={chairmanForm.townId} 
+                    onChange={handleChairmanChange} 
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" 
+                    required
+                  >
+                    <option value="">Select town first...</option>
+                    {towns.map((town) => (
+                      <option key={town._id} value={town._id}>{town.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Union Council *</label>
+                  <select 
+                    name="ucId" 
+                    value={chairmanForm.ucId} 
+                    onChange={handleChairmanChange} 
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" 
+                    required
+                    disabled={!chairmanForm.townId}
+                  >
+                    <option value="">Select UC...</option>
+                    {ucs.map((uc) => (
+                      <option key={uc._id} value={uc._id}>{uc.name}</option>
+                    ))}
+                  </select>
+                  {!chairmanForm.townId && (
+                    <p className="text-xs text-foreground/50">Select a town first to load UCs</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Official Email *</label>
+                  <input 
+                    type="email" 
+                    name="email" 
+                    value={chairmanForm.email} 
+                    onChange={handleChairmanChange} 
+                    placeholder="chairman@uc.gov" 
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-3 text-sm focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all" 
+                    required 
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+                  <p className="text-xs text-foreground/50">Chairman will receive invitation and registration link via email</p>
+                  <button type="submit" className="px-8 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm hover:shadow-lg hover:shadow-primary/25 flex items-center gap-2">
+                    Send Invitation<Icons.ArrowRight />
+                  </button>
+                </div>
+              </form>
+              {chairmanSuccess && (
+                <div className="mx-6 mb-6 rounded-xl border-2 border-secondary/30 bg-secondary/10 px-4 py-3 flex items-center gap-3">
+                  <div className="p-1.5 rounded-full bg-secondary/20 text-secondary"><Icons.Check /></div>
+                  <div><p className="text-sm font-semibold text-foreground">UC chairman invited!</p><p className="text-xs text-foreground/60">Invitation email sent</p></div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Citizen Feedback */}
+          {activeOperation === 'feedback' && (
+            <section className="bg-white rounded-2xl border border-foreground/10 overflow-hidden shadow-sm">
+              <div className="bg-gradient-to-r from-secondary/5 to-primary/5 px-6 py-5 border-b border-foreground/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-secondary/10 text-secondary"><Icons.Feedback /></div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">Citizen Feedback</h3>
+                      <p className="text-sm text-foreground/60">Citywide satisfaction monitoring - Coming soon</p>
                     </div>
                   </div>
-                  <p className="text-sm text-foreground/80 bg-foreground/[0.02] rounded-lg p-3 border border-foreground/5">"{fb.message}"</p>
-                  <p className="text-xs text-foreground/40 mt-2 flex items-center gap-1"><Icons.Clock />{fb.date}</p>
                 </div>
-              );
-            })}
-          </div>
-        </section>
+              </div>
+              <div className="p-8 text-center">
+                <p className="text-foreground/60">Feedback monitoring feature will be available soon</p>
+                <p className="text-sm text-foreground/50 mt-2">Average citizen rating: {analytics?.summary?.avgCitizenRating || 'N/A'}</p>
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );

@@ -26,6 +26,9 @@ const {
   findUCByLocation,
   getNearbyUCs,
   getHierarchyStats,
+  assignMayorToCity,
+  assignTownChairman,
+  assignUCChairman,
 } = require('../controllers/hierarchyController');
 
 const { protect, authorize } = require('../middlewares/authMiddleware');
@@ -62,6 +65,9 @@ router.route('/cities/:cityId')
   .put(authorize('website_admin'), updateCity)
   .delete(authorize('website_admin'), deactivateCity);
 
+// Assign mayor to city
+router.patch('/cities/:cityId/assign-mayor', authorize('website_admin'), assignMayorToCity);
+
 // =====================
 // TOWN ROUTES
 // =====================
@@ -77,6 +83,9 @@ router.route('/towns/:townId')
   .put(authorize('website_admin', 'mayor'), updateTown)
   .delete(authorize('website_admin', 'mayor'), deactivateTown);
 
+// Assign town chairman
+router.patch('/towns/:townId/assign-chairman', authorize('website_admin', 'mayor'), assignTownChairman);
+
 // =====================
 // UC ROUTES
 // =====================
@@ -91,5 +100,8 @@ router.route('/ucs/:ucId')
   .get(getUC)
   .put(authorize('website_admin', 'mayor', 'town_chairman'), updateUC)
   .delete(authorize('website_admin', 'mayor', 'town_chairman'), deactivateUC);
+
+// Assign UC chairman
+router.patch('/ucs/:ucId/assign-chairman', authorize('website_admin', 'mayor', 'town_chairman'), assignUCChairman);
 
 module.exports = router;
