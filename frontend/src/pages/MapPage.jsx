@@ -54,30 +54,8 @@ const MapPage = () => {
 
   return (
     <div className="relative h-screen w-full">
-      {/* Floating Navigation Panel */}
-      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
-        {/* Back to Dashboard */}
-        {isAuthenticated && (
-          <Link
-            to={dashboardPath}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 text-gray-700 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
-          >
-            <ArrowLeftIcon />
-            <span className="text-sm font-medium">Dashboard</span>
-          </Link>
-        )}
-
-        {/* Profile Link */}
-        {isAuthenticated && (
-          <Link
-            to={profilePath}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 text-gray-700 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
-          >
-            <UserIcon />
-            <span className="text-sm font-medium">Profile</span>
-          </Link>
-        )}
-
+      {/* Back to Home/Dashboard - Top Left */}
+      <div className="absolute top-4 left-4 z-[1000]">
         {/* Home Link (if not authenticated) */}
         {!isAuthenticated && (
           <Link
@@ -90,16 +68,16 @@ const MapPage = () => {
         )}
       </div>
 
-      {/* User Badge */}
-      {isAuthenticated && user && (
-        <div className="absolute top-4 right-4 z-[1000] flex items-center gap-3 px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50">
-          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary font-semibold flex items-center justify-center text-sm">
-            {user.name?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-800">{user.name}</p>
-            <p className="text-xs text-gray-500 capitalize">{user.role?.replace('_', ' ')}</p>
-          </div>
+      {/* Dashboard Button - Top Right */}
+      {isAuthenticated && (
+        <div className="absolute top-4 right-4 z-[1000]">
+          <Link
+            to={dashboardPath}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 text-gray-700 hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 group"
+          >
+            <ArrowLeftIcon />
+            <span className="text-sm font-medium">Dashboard</span>
+          </Link>
         </div>
       )}
 

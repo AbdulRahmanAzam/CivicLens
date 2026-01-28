@@ -72,6 +72,9 @@ router.patch('/cities/:cityId/assign-mayor', authorize('website_admin'), assignM
 // TOWN ROUTES
 // =====================
 
+// Get all towns (for dropdowns, invitations, etc.)
+router.get('/towns', getTowns);
+
 // Towns within a city
 router.route('/cities/:cityId/towns')
   .get(getTowns)
@@ -89,6 +92,9 @@ router.patch('/towns/:townId/assign-chairman', authorize('website_admin', 'mayor
 // =====================
 // UC ROUTES
 // =====================
+
+// Get all UCs (for dropdowns, invitations, etc.)
+router.get('/ucs', getUCs);
 
 // UCs within a town
 router.route('/towns/:townId/ucs')
