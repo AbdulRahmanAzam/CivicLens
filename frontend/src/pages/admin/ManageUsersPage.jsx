@@ -3,7 +3,7 @@
  * Admin page for managing citizen users
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Button, 
   Card, 
@@ -19,7 +19,7 @@ import {
   Avatar
 } from '../../components/ui';
 import { Modal, ConfirmDialog } from '../../components/ui/Modal';
-import { authApi } from '../../services/api';
+// import { authApi } from '../../services/api';
 
 // Icons
 const SearchIcon = () => (
@@ -146,7 +146,7 @@ const ManageUsersPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // Fetch users
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       // In production, this would be an API call
@@ -165,17 +165,17 @@ const ManageUsersPage = () => {
       }
       
       setUsers(filtered);
-      setPagination({ ...pagination, total: filtered.length, totalPages: 1 });
-    } catch (err) {
+      setPagination(prev => ({ ...prev, total: filtered.length, totalPages: 1 }));
+    } catch {
       setError('Failed to load users');
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchUsers();
-  }, [searchQuery, statusFilter]);
+  }, [fetchUsers]);
 
   // Handle edit
   const handleEdit = (user) => {
@@ -200,7 +200,7 @@ const ManageUsersPage = () => {
         u._id === selectedUser._id ? { ...u, ...formData } : u
       ));
       setEditModal(false);
-    } catch (err) {
+    } catch {
       setError('Failed to update user');
     } finally {
       setSubmitting(false);
@@ -215,7 +215,7 @@ const ManageUsersPage = () => {
       setUsers(users.map(u => 
         u._id === user._id ? { ...u, status: newStatus } : u
       ));
-    } catch (err) {
+    } catch {
       setError('Failed to update user status');
     }
   };
@@ -233,7 +233,7 @@ const ManageUsersPage = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       setUsers(users.filter(u => u._id !== selectedUser._id));
       setDeleteModal(false);
-    } catch (err) {
+    } catch {
       setError('Failed to delete user');
     } finally {
       setSubmitting(false);

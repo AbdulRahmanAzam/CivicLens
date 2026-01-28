@@ -3,7 +3,7 @@
  * For officials to manage complaints in their territory
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { complaintsApi } from '../../services/api';
 import { 
@@ -140,7 +140,7 @@ const ManageComplaintsPage = () => {
   const [updating, setUpdating] = useState(false);
 
   // Fetch complaints
-  const fetchComplaints = async () => {
+  const fetchComplaints = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -159,21 +159,21 @@ const ManageComplaintsPage = () => {
       const data = response.data;
 
       setComplaints(data.data || []);
-      setPagination({
-        ...pagination,
+      setPagination(prev => ({
+        ...prev,
         total: data.total || 0,
         totalPages: data.totalPages || 1,
-      });
+      }));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch complaints');
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, statusFilter, severityFilter, searchQuery]);
 
   useEffect(() => {
     fetchComplaints();
-  }, [pagination.page, statusFilter, severityFilter]);
+  }, [fetchComplaints]);
 
   // Handle search
   const handleSearch = (e) => {

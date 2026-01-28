@@ -13,11 +13,15 @@ import ProtectedRoute, {
 } from './components/ProtectedRoute'
 import { 
   LandingPage, 
+  MapPage,
+  AboutPage,
+  ContactPage,
+  PrivacyPolicyPage,
+  TermsOfServicePage,
   CitizenLogin, 
   CitizenRegister, 
   OfficialLogin, 
   AdminLogin,
-  MapPage,
   AdminDashboard,
   CitizenDashboard,
   MayorDashboard,
@@ -83,6 +87,10 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
           
           {/* Map View - Public */}
           <Route path="/map" element={<MapPage />} />

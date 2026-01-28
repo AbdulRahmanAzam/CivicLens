@@ -67,49 +67,34 @@ const UCChairmanDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex">
-        <aside className="w-72 min-h-screen border-r border-foreground/10 bg-white/80 backdrop-blur">
-          <div className="px-6 py-6 border-b border-foreground/10">
-            <p className="text-xs uppercase tracking-[0.2em] text-foreground/50">Union Council</p>
-            <h1 className="text-xl font-semibold mt-2">CivicLens UC Desk</h1>
-          </div>
-          <nav className="px-4 py-6 space-y-2">
-            {operations.map((operation) => (
-              <button
-                key={operation.id}
-                type="button"
-                onClick={() => setActiveOperation(operation.id)}
-                className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
-                  activeOperation === operation.id
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white border-foreground/10 hover:border-foreground/30'
-                }`}
-              >
-                <p className="text-sm font-semibold">{operation.label}</p>
-                <p
-                  className={`text-xs mt-1 ${
-                    activeOperation === operation.id ? 'text-white/70' : 'text-foreground/60'
-                  }`}
-                >
-                  {operation.description}
-                </p>
-              </button>
-            ))}
-          </nav>
-        </aside>
+    <div className="max-w-5xl">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <p className="text-sm text-foreground/60">Welcome, UC Chairman</p>
+          <h2 className="text-2xl font-semibold">Union council operations</h2>
+        </div>
+        <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
+          UC access
+        </div>
+      </div>
 
-        <main className="flex-1 px-8 py-8">
-          <div className="max-w-5xl">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <p className="text-sm text-foreground/60">Welcome, UC Chairman</p>
-                <h2 className="text-2xl font-semibold">Union council operations</h2>
-              </div>
-              <div className="px-4 py-2 rounded-full bg-primary/15 text-primary text-xs font-semibold">
-                UC access
-              </div>
-            </div>
+      {/* Operation tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {operations.map((operation) => (
+          <button
+            key={operation.id}
+            type="button"
+            onClick={() => setActiveOperation(operation.id)}
+            className={`px-4 py-2 rounded-xl border transition-all whitespace-nowrap ${
+              activeOperation === operation.id
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white border-foreground/10 hover:border-foreground/30'
+            }`}
+          >
+            <p className="text-sm font-semibold">{operation.label}</p>
+          </button>
+        ))}
+      </div>
 
             {activeOperation === 'browse' && (
               <section className="bg-white rounded-2xl border border-foreground/10 p-6 shadow-sm">
@@ -204,9 +189,6 @@ const UCChairmanDashboard = () => {
               </section>
             )}
           </div>
-        </main>
-      </div>
-    </div>
   );
 };
 

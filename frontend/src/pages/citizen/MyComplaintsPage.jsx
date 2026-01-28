@@ -3,7 +3,7 @@
  * Lists all complaints submitted by the current user
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { complaintsApi } from '../../services/api';
 import { 
@@ -19,7 +19,7 @@ import {
   EmptyState,
   Alert 
 } from '../../components/ui';
-import useFilterStore from '../../store/filterStore';
+// import useFilterStore from '../../store/filterStore';
 
 // Icons
 const PlusIcon = () => (
@@ -136,7 +136,7 @@ const MyComplaintsPage = () => {
   // const { filters, setFilter, resetFilters } = useFilterStore();
 
   // Fetch complaints
-  const fetchComplaints = async () => {
+  const fetchComplaints = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -154,21 +154,21 @@ const MyComplaintsPage = () => {
       const data = response.data;
 
       setComplaints(data.data || []);
-      setPagination({
-        ...pagination,
+      setPagination(prev => ({
+        ...prev,
         total: data.total || 0,
         totalPages: data.totalPages || 1,
-      });
+      }));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch complaints');
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, statusFilter, searchQuery]);
 
   useEffect(() => {
     fetchComplaints();
-  }, [pagination.page, statusFilter]);
+  }, [fetchComplaints]);
 
   // Handle search
   const handleSearch = (e) => {

@@ -424,6 +424,56 @@ export const territoriesApi = {
     const response = await api.get('/territories/towns');
     return response.data;
   },
+
+  /**
+   * Get list of all Cities
+   * @returns {Promise} - Array of City objects
+   */
+  getCities: async () => {
+    const response = await api.get('/territories/cities');
+    return response.data;
+  },
+
+  /**
+   * Get single territory by ID
+   * @param {string} id - Territory ID
+   * @returns {Promise} - Territory details
+   */
+  getTerritory: async (id) => {
+    const response = await api.get(`/territories/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Create new territory
+   * @param {Object} data - Territory data (type, name, code, etc.)
+   * @returns {Promise} - Created territory
+   */
+  createTerritory: async (data) => {
+    const response = await api.post('/territories', data);
+    return response.data;
+  },
+
+  /**
+   * Update territory
+   * @param {string} id - Territory ID
+   * @param {Object} data - Updated data
+   * @returns {Promise} - Updated territory
+   */
+  updateTerritory: async (id, data) => {
+    const response = await api.put(`/territories/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete (deactivate) territory
+   * @param {string} id - Territory ID
+   * @returns {Promise} - Success message
+   */
+  deleteTerritory: async (id) => {
+    const response = await api.delete(`/territories/${id}`);
+    return response.data;
+  },
 };
 
 /**

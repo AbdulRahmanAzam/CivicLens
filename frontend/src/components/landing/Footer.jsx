@@ -1,18 +1,19 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
   const footerLinks = {
     Product: [
-      { name: 'Features', href: '#features' },
-      { name: 'How It Works', href: '#how-it-works' },
-      { name: 'Pricing', href: '#' },
-      { name: 'Roadmap', href: '#' },
+      { name: 'Features', href: '/#features' },
+      { name: 'How It Works', href: '/#how-it-works' },
+      { name: 'View Map', href: '/map' },
+      { name: 'Report Issue', href: '/register' },
     ],
     Company: [
-      { name: 'About Us', href: '#' },
+      { name: 'About Us', href: '/about' },
+      { name: 'Contact', href: '/contact' },
       { name: 'Careers', href: '#' },
       { name: 'Press', href: '#' },
-      { name: 'Contact', href: '#' },
     ],
     Resources: [
       { name: 'Documentation', href: '#' },
@@ -21,8 +22,8 @@ const Footer = () => {
       { name: 'Case Studies', href: '#' },
     ],
     Legal: [
-      { name: 'Privacy Policy', href: '#' },
-      { name: 'Terms of Service', href: '#' },
+      { name: 'Privacy Policy', href: '/privacy' },
+      { name: 'Terms of Service', href: '/terms' },
       { name: 'Cookie Policy', href: '#' },
       { name: 'Security', href: '#' },
     ],
@@ -72,9 +73,15 @@ const Footer = () => {
               <ul className="space-y-2">
                 {links.map((link) => (
                   <li key={link.name}>
-                    <a href={link.href} className="text-white/60 hover:text-white transition-colors text-sm">
-                      {link.name}
-                    </a>
+                    {link.href.startsWith('#') ? (
+                      <a href={link.href} className="text-white/60 hover:text-white transition-colors text-sm">
+                        {link.name}
+                      </a>
+                    ) : (
+                      <Link to={link.href} className="text-white/60 hover:text-white transition-colors text-sm">
+                        {link.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -88,12 +95,12 @@ const Footer = () => {
             © 2026 CivicLens. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-            <a href="#" className="text-white/60 hover:text-white text-sm transition-colors">
+            <Link to="/privacy" className="text-white/60 hover:text-white text-sm transition-colors">
               Privacy
-            </a>
-            <a href="#" className="text-white/60 hover:text-white text-sm transition-colors">
+            </Link>
+            <Link to="/terms" className="text-white/60 hover:text-white text-sm transition-colors">
               Terms
-            </a>
+            </Link>
             <a href="#" className="text-white/60 hover:text-white text-sm transition-colors">
               Cookies
             </a>

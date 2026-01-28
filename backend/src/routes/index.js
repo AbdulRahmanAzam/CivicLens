@@ -9,6 +9,7 @@ const whatsappRoutes = require('./whatsappRoutes');
 const hierarchyRoutes = require('./hierarchy');
 const invitationRoutes = require('./invitation');
 const analyticsRoutes = require('./analytics');
+const territoryRoutes = require('./territoryRoutes');
 
 /**
  * API Routes
@@ -47,6 +48,9 @@ router.use('/invitations', invitationRoutes);
 
 // Analytics routes (hierarchy-based reporting)
 router.use('/analytics', analyticsRoutes);
+
+// Territory routes (for map visualization and admin management)
+router.use('/territories', territoryRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
@@ -123,6 +127,16 @@ router.get('/', (req, res) => {
         'GET /api/v1/analytics/town/:townId': 'Town analytics (town_chairman+)',
         'GET /api/v1/analytics/uc/:ucId': 'UC analytics (uc_chairman+)',
         'GET /api/v1/analytics/sla-performance': 'SLA performance report',
+      },
+      territories: {
+        'GET /api/v1/territories': 'Get territories with boundaries (level=UC|Town, city=name)',
+        'GET /api/v1/territories/ucs': 'Get UC list (without boundaries)',
+        'GET /api/v1/territories/towns': 'Get Town list (without boundaries)',
+        'GET /api/v1/territories/cities': 'Get City list',
+        'GET /api/v1/territories/:id': 'Get territory by ID',
+        'POST /api/v1/territories': 'Create territory (admin)',
+        'PUT /api/v1/territories/:id': 'Update territory (admin)',
+        'DELETE /api/v1/territories/:id': 'Delete territory (admin)',
       },
     },
   });

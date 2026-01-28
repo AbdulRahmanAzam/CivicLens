@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { complaintsApi, categoriesApi, voiceApi } from '../../services/api';
+import { complaintsApi, categoriesApi } from '../../services/api';
 import { 
   Button, 
   Input, 
@@ -67,6 +67,7 @@ const ReportIssuePage = () => {
   const [locationLoading, setLocationLoading] = useState(false);
   const [images, setImages] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [voiceNote, setVoiceNote] = useState(null);
 
   const {
@@ -124,7 +125,7 @@ const ReportIssuePage = () => {
         
         setLocationLoading(false);
       },
-      (err) => {
+      () => {
         setError('Failed to get your location. Please enable location services.');
         setLocationLoading(false);
       }
@@ -164,7 +165,7 @@ const ReportIssuePage = () => {
         // Start recording
         setIsRecording(true);
         // Recording logic would be implemented here
-      } catch (err) {
+      } catch {
         setError('Failed to access microphone');
       }
     }
@@ -191,7 +192,7 @@ const ReportIssuePage = () => {
       }
 
       // Append images
-      images.forEach((img, index) => {
+      images.forEach((img) => {
         formData.append('images', img.file);
       });
 
