@@ -33,7 +33,15 @@ const useComplaints = (filters = {}, options = {}) => {
 
     try {
       const response = await complaintsApi.getComplaints(filterParams);
-      const complaintsData = response.complaints || response.data || [];
+      const complaintsData = Array.isArray(response?.data?.complaints)
+        ? response.data.complaints
+        : Array.isArray(response?.complaints)
+          ? response.complaints
+          : Array.isArray(response?.data)
+            ? response.data
+            : Array.isArray(response)
+              ? response
+              : [];
       
       setComplaints(complaintsData);
       

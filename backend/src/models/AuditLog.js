@@ -240,6 +240,13 @@ auditLogSchema.statics.log = async function(data) {
 };
 
 /**
+ * Backward-compatible alias for log()
+ */
+auditLogSchema.statics.logAction = function(data) {
+  return this.log(data);
+};
+
+/**
  * Static method to log authentication event
  */
 auditLogSchema.statics.logAuth = function(action, user, request, result = 'success', error = null) {

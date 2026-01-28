@@ -43,16 +43,20 @@ const ChevronRightIcon = () => (
 // Status badge variants
 const getStatusVariant = (status) => {
   switch (status) {
-    case 'pending':
+    case 'submitted':
       return 'warning';
-    case 'assigned':
+    case 'acknowledged':
       return 'info';
     case 'in_progress':
       return 'primary';
     case 'resolved':
       return 'success';
+    case 'closed':
+      return 'success';
     case 'rejected':
       return 'danger';
+    case 'citizen_feedback':
+      return 'default';
     default:
       return 'default';
   }
@@ -88,23 +92,25 @@ const ComplaintCard = ({ complaint }) => {
 
   return (
     <Card 
-      className="hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => navigate(`/citizen/complaints/${complaint._id}`)}
-    >
+        className="hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() => navigate(`/citizen/complaints/${complaint.id}`)}
+      >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">{complaint.title}</h3>
-            <p className="text-sm text-foreground/60 mt-1 line-clamp-2">{complaint.description}</p>
+              <h3 className="font-semibold text-foreground truncate">
+                {complaint.category?.primary || 'Reported issue'}
+              </h3>
+              <p className="text-sm text-foreground/60 mt-1 line-clamp-2">{complaint.description}</p>
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <Badge variant={getStatusVariant(complaint.status)}>
                 {complaint.status?.replace('_', ' ')}
               </Badge>
-              <Badge variant={getSeverityVariant(complaint.severity)}>
-                {complaint.severity}
+                <Badge variant={getSeverityVariant(complaint.severity?.priority)}>
+                  {complaint.severity?.priority || 'medium'}
               </Badge>
-              {complaint.category?.name && (
-                <Badge variant="outline">{complaint.category.name}</Badge>
+                {complaint.category?.primary && (
+                  <Badge variant="outline">{complaint.category.primary}</Badge>
               )}
             </div>
             <p className="text-xs text-foreground/50 mt-3">
@@ -144,20 +150,21 @@ const MyComplaintsPage = () => {
       const params = {
         page: pagination.page,
         limit: pagination.limit,
-        mineOnly: true,
       };
 
       if (statusFilter) params.status = statusFilter;
       if (searchQuery) params.search = searchQuery;
 
-      const response = await complaintsApi.getComplaints(params);
-      const data = response.data;
+      const response = await complaintsApi.getMyComplaints(params);
+      const payload = response.data || response;
+      const complaintsData = payload.complaints || [];
+      const pageInfo = payload.pagination || {};
 
-      setComplaints(data.data || []);
+      setComplaints(complaintsData);
       setPagination({
         ...pagination,
-        total: data.total || 0,
-        totalPages: data.totalPages || 1,
+        total: pageInfo.total || 0,
+        totalPages: pageInfo.totalPages || 1,
       });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch complaints');
@@ -180,7 +187,7 @@ const MyComplaintsPage = () => {
   // Stats
   const stats = {
     total: pagination.total,
-    pending: complaints.filter((c) => c.status === 'pending').length,
+    pending: complaints.filter((c) => c.status === 'submitted').length,
     inProgress: complaints.filter((c) => c.status === 'in_progress').length,
     resolved: complaints.filter((c) => c.status === 'resolved').length,
   };
@@ -250,10 +257,11 @@ const MyComplaintsPage = () => {
               className="sm:w-48"
             >
               <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="assigned">Assigned</option>
+              <option value="submitted">Submitted</option>
+              <option value="acknowledged">Acknowledged</option>
               <option value="in_progress">In Progress</option>
               <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
               <option value="rejected">Rejected</option>
             </Select>
             <Button type="submit">Search</Button>

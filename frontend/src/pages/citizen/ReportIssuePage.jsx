@@ -28,12 +28,28 @@ import {
 const reportSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters').max(100, 'Title must not exceed 100 characters'),
   description: z.string().min(20, 'Description must be at least 20 characters').max(1000, 'Description must not exceed 1000 characters'),
+  name: z.string().optional(),
+  phone: z.string().min(10, 'Phone is required').regex(/^[+]?[-\d\s]{10,15}$/, 'Enter a valid phone number'),
+  email: z.string().email('Enter a valid email').optional().or(z.literal('')),
   category: z.string().min(1, 'Please select a category'),
   severity: z.enum(['low', 'medium', 'high', 'critical'], { message: 'Please select severity' }),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  latitude: z.number({ required_error: 'Latitude is required' }),
+  longitude: z.number({ required_error: 'Longitude is required' }),
   address: z.string().optional(),
 });
+
+const FALLBACK_CATEGORIES = [
+  { id: 'roads', name: 'Roads & Infrastructure' },
+  { id: 'water', name: 'Water Supply' },
+  { id: 'electricity', name: 'Electricity' },
+  { id: 'sanitation', name: 'Sanitation & Waste' },
+  { id: 'drainage', name: 'Drainage & Flooding' },
+  { id: 'streetlights', name: 'Street Lights' },
+  { id: 'public-safety', name: 'Public Safety' },
+  { id: 'parks', name: 'Parks & Recreation' },
+  { id: 'transport', name: 'Public Transport' },
+  { id: 'other', name: 'Other' },
+];
 
 // Location icon
 const LocationIcon = () => (
@@ -86,9 +102,16 @@ const ReportIssuePage = () => {
     const fetchCategories = async () => {
       try {
         const response = await categoriesApi.getCategories();
-        setCategories(response.data.data || []);
+        const payload = response.data || response;
+        const list = payload?.data?.categories || payload?.categories || [];
+        const normalized = Array.isArray(list) ? list : [];
+        const normalizedList = normalized.map((cat) =>
+          typeof cat === 'string' ? { id: cat, name: cat } : cat
+        );
+        setCategories(normalizedList.length ? normalizedList : FALLBACK_CATEGORIES);
       } catch (err) {
         console.error('Failed to fetch categories:', err);
+        setCategories(FALLBACK_CATEGORIES);
       }
     };
     fetchCategories();
@@ -106,8 +129,8 @@ const ReportIssuePage = () => {
       async (position) => {
         const { latitude, longitude } = position.coords;
         setLocation({ lat: latitude, lng: longitude });
-        setValue('lat', latitude);
-        setValue('lng', longitude);
+        setValue('latitude', latitude, { shouldValidate: true });
+        setValue('longitude', longitude, { shouldValidate: true });
         
         // Try to get address using reverse geocoding
         try {
@@ -177,15 +200,15 @@ const ReportIssuePage = () => {
 
     try {
       const formData = new FormData();
-      formData.append('title', data.title);
-      formData.append('description', data.description);
+      formData.append('description', `${data.title}: ${data.description}`);
+      if (data.name) formData.append('name', data.name);
+      formData.append('phone', data.phone);
+      if (data.email) formData.append('email', data.email);
       formData.append('category', data.category);
       formData.append('severity', data.severity);
       
-      if (data.lat && data.lng) {
-        formData.append('lat', data.lat);
-        formData.append('lng', data.lng);
-      }
+      formData.append('latitude', data.latitude);
+      formData.append('longitude', data.longitude);
       if (data.address) {
         formData.append('address', data.address);
       }
@@ -207,7 +230,17 @@ const ReportIssuePage = () => {
         navigate('/citizen/complaints');
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit complaint. Please try again.');
+      const validationErrors = err.response?.data?.errors
+        ? err.response.data.errors
+            .map((e) => `${e.field}: ${e.message}`)
+            .join(', ')
+        : null;
+      setError(
+        validationErrors ||
+          err.response?.data?.message ||
+          err.message ||
+          'Failed to submit complaint. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -269,32 +302,48 @@ const ReportIssuePage = () => {
               {...register('title')}
             />
 
+            {/* Contact Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Your Name"
+                placeholder="Optional"
+                error={errors.name?.message}
+                {...register('name')}
+              />
+              <Input
+                label="Phone Number"
+                placeholder="03XX-XXXXXXX"
+                error={errors.phone?.message}
+                {...register('phone')}
+              />
+            </div>
+
+            <Input
+              label="Email"
+              type="email"
+              placeholder="Optional"
+              error={errors.email?.message}
+              {...register('email')}
+            />
+
             {/* Category */}
             <Select
               label="Category"
               error={errors.category?.message}
+              options={categories.map((cat) => ({
+                value: cat.name || cat.id || cat._id,
+                label: cat.name || cat.id || cat._id,
+              }))}
               {...register('category')}
-            >
-              <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat._id} value={cat._id}>
-                  {cat.name}
-                </option>
-              ))}
-            </Select>
+            />
 
             {/* Severity */}
             <Select
               label="Severity Level"
               error={errors.severity?.message}
+              options={severityOptions}
               {...register('severity')}
-            >
-              {severityOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </Select>
+            />
 
             {/* Description */}
             <Textarea
@@ -321,6 +370,33 @@ const ReportIssuePage = () => {
                   {location ? 'Update Location' : 'Get Current Location'}
                 </Button>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <Input
+                  label="Latitude"
+                  type="number"
+                  placeholder="24.8607"
+                  error={errors.latitude?.message}
+                  inputClassName="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  step="any"
+                  {...register('latitude', { valueAsNumber: true })}
+                />
+                <Input
+                  label="Longitude"
+                  type="number"
+                  placeholder="67.0011"
+                  error={errors.longitude?.message}
+                  inputClassName="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  step="any"
+                  {...register('longitude', { valueAsNumber: true })}
+                />
+              </div>
+              <Input
+                label="Address (Optional)"
+                placeholder="Street address or landmark"
+                error={errors.address?.message}
+                className="mt-4"
+                {...register('address')}
+              />
               {location && (
                 <p className="mt-2 text-sm text-foreground/60">
                   📍 Location captured: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}

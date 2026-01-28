@@ -244,6 +244,18 @@ export const authApi = {
  */
 export const complaintsApi = {
   /**
+   * Get current user's complaints
+   */
+  getMyComplaints: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.status) queryParams.append('status', params.status);
+
+    const response = await api.get(`/complaints/my?${queryParams.toString()}`);
+    return response.data;
+  },
+  /**
    * Fetch complaints with optional filters
    * @param {Object} filters - Query parameters for filtering
    * @returns {Promise} - Array of complaints
@@ -350,7 +362,10 @@ export const complaintsApi = {
    * @returns {Promise} - Created complaint
    */
   createComplaint: async (complaintData) => {
-    const response = await api.post('/complaints', complaintData);
+    const isFormData = typeof FormData !== 'undefined' && complaintData instanceof FormData;
+    const response = await api.post('/complaints', complaintData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return response.data;
   },
 

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
 
 const env = require('./config/env');
 const routes = require('./routes');
@@ -65,6 +66,11 @@ app.use((req, res, next) => {
  * API Routes
  */
 app.use('/api/v1', routes);
+
+/**
+ * Static uploads
+ */
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 /**
  * Root endpoint
