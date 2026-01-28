@@ -5,19 +5,18 @@ const crypto = require('crypto');
  * Invitation Schema
  * Manages invitations for UC Chairmen, Town Chairmen, and Mayors
  * Features: 24-hour expiry, single-use tokens, role-based creation
+ * 
+ * Updated to support both service patterns:
+ * - `role` and `targetRole` (same field)
+ * - Separate `targetUC`, `targetTown`, `targetCity` fields
+ * - `token` stores hashed value directly (service hashes before saving)
  */
 const invitationSchema = new mongoose.Schema({
-  // Unique invitation token (crypto-secure)
+  // Hashed invitation token (service hashes before saving)
   token: {
     type: String,
     required: true,
     unique: true,
-    index: true,
-  },
-  // Hashed token for secure storage
-  tokenHash: {
-    type: String,
-    required: true,
     index: true,
   },
   // Email address of invitee
@@ -29,79 +28,81 @@ const invitationSchema = new mongoose.Schema({
     match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address'],
   },
   // Role the invitee will have after registration
-  targetRole: {
+  // Service uses 'role', keeping for compatibility
+  role: {
     type: String,
-    required: [true, 'Target role is required'],
+    required: [true, 'Role is required'],
     enum: ['uc_chairman', 'town_chairman', 'mayor'],
   },
-  // Reference to entity they'll manage
-  targetEntity: {
-    type: {
-      type: String,
-      enum: ['uc', 'town', 'city'],
-      required: true,
-    },
-    id: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      refPath: 'targetEntity.model',
-    },
-    model: {
-      type: String,
-      enum: ['UC', 'Town', 'City'],
-      required: true,
-    },
-    name: {
-      type: String,
-      trim: true,
-    },
+  
+  // Separate entity references (service pattern)
+  targetUC: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UC',
   },
+  targetTown: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Town',
+  },
+  targetCity: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'City',
+  },
+  
   // Who created this invitation
   invitedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Inviter is required'],
   },
-  inviterRole: {
-    type: String,
-    enum: ['town_chairman', 'mayor', 'website_admin'],
-    required: true,
-  },
+  
   // Invitation status
   status: {
     type: String,
     enum: ['pending', 'accepted', 'expired', 'revoked'],
     default: 'pending',
   },
+  
   // Expiration time (24 hours from creation)
   expiresAt: {
     type: Date,
     required: true,
     default: () => new Date(Date.now() + 24 * 60 * 60 * 1000),
-    index: { expires: 0 }, // TTL index for automatic cleanup
   },
+  
   // When the invitation was used
   acceptedAt: {
     type: Date,
   },
+  
   // User created from this invitation
   acceptedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  
+  // Who revoked (if revoked)
+  revokedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  revokedAt: {
+    type: Date,
+  },
+  
+  // Resend tracking
+  resentCount: {
+    type: Number,
+    default: 0,
+  },
+  lastResentAt: {
+    type: Date,
+  },
+  
   // Invitation message (optional)
   message: {
     type: String,
     maxlength: [500, 'Message cannot exceed 500 characters'],
-  },
-  // Metadata
-  metadata: {
-    ipAddress: String,
-    userAgent: String,
-    acceptedIp: String,
-    acceptedUserAgent: String,
-    resendCount: { type: Number, default: 0 },
-    lastResendAt: Date,
   },
 }, {
   timestamps: true,
@@ -110,49 +111,11 @@ const invitationSchema = new mongoose.Schema({
 // Indexes
 invitationSchema.index({ email: 1, status: 1 });
 invitationSchema.index({ invitedBy: 1 });
-invitationSchema.index({ 'targetEntity.id': 1 });
+invitationSchema.index({ targetUC: 1 });
+invitationSchema.index({ targetTown: 1 });
+invitationSchema.index({ targetCity: 1 });
 invitationSchema.index({ status: 1, expiresAt: 1 });
-
-/**
- * Pre-save middleware to generate token and hash
- */
-invitationSchema.pre('save', function(next) {
-  if (this.isNew) {
-    // Generate a secure random token
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    this.token = rawToken;
-    
-    // Store a hash of the token
-    this.tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
-  }
-  next();
-});
-
-/**
- * Pre-save middleware to set target entity model based on role
- */
-invitationSchema.pre('save', function(next) {
-  if (this.isModified('targetRole') || this.isNew) {
-    switch (this.targetRole) {
-      case 'uc_chairman':
-        this.targetEntity.type = 'uc';
-        this.targetEntity.model = 'UC';
-        break;
-      case 'town_chairman':
-        this.targetEntity.type = 'town';
-        this.targetEntity.model = 'Town';
-        break;
-      case 'mayor':
-        this.targetEntity.type = 'city';
-        this.targetEntity.model = 'City';
-        break;
-    }
-  }
-  next();
-});
+invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 
 /**
  * Instance method to check if invitation is valid
@@ -167,7 +130,7 @@ invitationSchema.methods.isValid = function() {
 /**
  * Instance method to mark invitation as accepted
  */
-invitationSchema.methods.accept = async function(userId, metadata = {}) {
+invitationSchema.methods.accept = async function(userId) {
   if (!this.isValid()) {
     throw new Error('Invitation is no longer valid');
   }
@@ -175,8 +138,6 @@ invitationSchema.methods.accept = async function(userId, metadata = {}) {
   this.status = 'accepted';
   this.acceptedAt = new Date();
   this.acceptedBy = userId;
-  this.metadata.acceptedIp = metadata.ipAddress;
-  this.metadata.acceptedUserAgent = metadata.userAgent;
 
   return this.save();
 };
@@ -184,12 +145,14 @@ invitationSchema.methods.accept = async function(userId, metadata = {}) {
 /**
  * Instance method to revoke invitation
  */
-invitationSchema.methods.revoke = async function() {
+invitationSchema.methods.revoke = async function(revokedByUserId) {
   if (this.status !== 'pending') {
     throw new Error('Can only revoke pending invitations');
   }
 
   this.status = 'revoked';
+  this.revokedBy = revokedByUserId;
+  this.revokedAt = new Date();
   return this.save();
 };
 
@@ -201,10 +164,9 @@ invitationSchema.methods.resend = async function() {
     throw new Error('Cannot resend this invitation');
   }
 
-  // Generate new token
+  // Generate new token (service will hash it)
   const rawToken = crypto.randomBytes(32).toString('hex');
-  this.token = rawToken;
-  this.tokenHash = crypto
+  this.token = crypto
     .createHash('sha256')
     .update(rawToken)
     .digest('hex');
@@ -212,105 +174,90 @@ invitationSchema.methods.resend = async function() {
   // Reset expiry
   this.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   this.status = 'pending';
-  this.metadata.resendCount = (this.metadata.resendCount || 0) + 1;
-  this.metadata.lastResendAt = new Date();
+  this.resentCount = (this.resentCount || 0) + 1;
+  this.lastResentAt = new Date();
 
-  return this.save();
+  await this.save();
+  return rawToken; // Return raw token for email
 };
 
 /**
  * Static method to create invitation with validation
+ * Simplified to match InvitationService usage
  */
 invitationSchema.statics.createInvitation = async function({
   email,
-  targetRole,
-  targetEntityId,
+  role,
+  targetUC,
+  targetTown,
+  targetCity,
   invitedBy,
-  inviterRole,
   message,
-  metadata,
 }) {
-  // Validate inviter can create this type of invitation
-  const validCreators = {
-    uc_chairman: ['town_chairman'],
-    town_chairman: ['mayor'],
-    mayor: ['website_admin'],
-  };
-
-  if (!validCreators[targetRole].includes(inviterRole)) {
-    throw new Error(`${inviterRole} cannot invite ${targetRole}`);
-  }
-
-  // Check for existing pending invitation to same email for same entity
-  const existing = await this.findOne({
+  // Check for existing pending invitation to same email
+  const existingQuery = {
     email,
-    'targetEntity.id': targetEntityId,
     status: 'pending',
     expiresAt: { $gt: new Date() },
-  });
+  };
+  
+  // Add entity filter based on role
+  if (role === 'uc_chairman' && targetUC) {
+    existingQuery.targetUC = targetUC;
+  } else if (role === 'town_chairman' && targetTown) {
+    existingQuery.targetTown = targetTown;
+  } else if (role === 'mayor' && targetCity) {
+    existingQuery.targetCity = targetCity;
+  }
+
+  const existing = await this.findOne(existingQuery);
 
   if (existing) {
     throw new Error('An active invitation already exists for this email and entity');
   }
 
-  // Get entity name
-  let entityName = '';
-  let entityModel = '';
-  
-  switch (targetRole) {
-    case 'uc_chairman':
-      entityModel = 'UC';
-      const UC = mongoose.model('UC');
-      const uc = await UC.findById(targetEntityId);
-      if (!uc) throw new Error('UC not found');
-      entityName = uc.name;
-      break;
-    case 'town_chairman':
-      entityModel = 'Town';
-      const Town = mongoose.model('Town');
-      const town = await Town.findById(targetEntityId);
-      if (!town) throw new Error('Town not found');
-      entityName = town.name;
-      break;
-    case 'mayor':
-      entityModel = 'City';
-      const City = mongoose.model('City');
-      const city = await City.findById(targetEntityId);
-      if (!city) throw new Error('City not found');
-      entityName = city.name;
-      break;
-  }
+  // Generate token
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(rawToken)
+    .digest('hex');
 
   // Create invitation
   const invitation = new this({
+    token: hashedToken,
     email,
-    targetRole,
-    targetEntity: {
-      id: targetEntityId,
-      model: entityModel,
-      name: entityName,
-    },
+    role,
+    targetUC,
+    targetTown,
+    targetCity,
     invitedBy,
-    inviterRole,
     message,
-    metadata,
   });
 
   await invitation.save();
-  return invitation;
+  
+  // Return both invitation and raw token for email
+  return { invitation, rawToken };
 };
 
 /**
  * Static method to find valid invitation by token
+ * Note: Token should be hashed before calling if using raw token from URL
  */
-invitationSchema.statics.findByToken = async function(token) {
-  const tokenHash = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
+invitationSchema.statics.findByToken = async function(token, hashIt = true) {
+  let searchToken = token;
+  
+  // Hash if it's a raw token
+  if (hashIt) {
+    searchToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+  }
 
   const invitation = await this.findOne({
-    tokenHash,
+    token: searchToken,
     status: 'pending',
     expiresAt: { $gt: new Date() },
   }).populate('invitedBy', 'name email role');
@@ -336,8 +283,17 @@ invitationSchema.statics.findByInviter = function(inviterId, options = {}) {
 /**
  * Static method to find all invitations for an entity
  */
-invitationSchema.statics.findByEntity = function(entityId, options = {}) {
-  const query = { 'targetEntity.id': entityId };
+invitationSchema.statics.findByEntity = function(entityId, entityType, options = {}) {
+  const query = {};
+  
+  // Set the correct entity field based on type
+  if (entityType === 'uc') {
+    query.targetUC = entityId;
+  } else if (entityType === 'town') {
+    query.targetTown = entityId;
+  } else if (entityType === 'city') {
+    query.targetCity = entityId;
+  }
   
   if (options.status) {
     query.status = options.status;
@@ -373,7 +329,7 @@ invitationSchema.statics.getStats = async function(options = {}) {
   const matchStage = {};
   
   if (options.inviterId) {
-    matchStage.invitedBy = mongoose.Types.ObjectId(options.inviterId);
+    matchStage.invitedBy = new mongoose.Types.ObjectId(options.inviterId);
   }
   
   if (options.since) {

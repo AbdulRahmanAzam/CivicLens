@@ -24,7 +24,7 @@ const useMapFilters = (initialFilters = {}) => {
 
   const [layerVisibility, setLayerVisibility] = useState({
     markers: true,
-    heatmap: false,
+    heatmap: true,
     ucBoundaries: false,
     townBoundaries: false,
     clusters: true,

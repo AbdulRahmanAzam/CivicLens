@@ -17,6 +17,7 @@ const useUiStore = create(
       theme: 'light',
       notifications: [],
       unreadCount: 0,
+      notificationsOpen: false,
 
       // Sidebar Actions
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -53,6 +54,8 @@ const useUiStore = create(
       },
 
       // Notification Actions
+      toggleNotifications: () => set((state) => ({ notificationsOpen: !state.notificationsOpen })),
+      closeNotifications: () => set({ notificationsOpen: false }),
       setNotifications: (notifications) => set({ 
         notifications,
         unreadCount: notifications.filter(n => !n.read).length 

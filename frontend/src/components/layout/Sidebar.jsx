@@ -15,6 +15,21 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
     </svg>
   ),
+  UserPlus: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+    </svg>
+  ),
+  Building: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  Invite: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
   Report: () => (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -104,23 +119,39 @@ const getNavigationItems = (role) => {
     { name: 'City Map', href: '/mayor/map', icon: Icons.Map },
     { name: 'Analytics', href: '/mayor/analytics', icon: Icons.Analytics },
     { name: 'Reports', href: '/mayor/reports', icon: Icons.Reports },
+    { name: 'Invite Town Chairman', href: '/mayor/invite/town-chairman', icon: Icons.UserPlus },
+  ];
+
+  const townChairmanNav = [
+    { name: 'Dashboard', href: '/official/dashboard', icon: Icons.Dashboard },
+    { name: 'Manage Complaints', href: '/official/complaints', icon: Icons.Complaints },
+    { name: 'Territory Map', href: '/official/territory', icon: Icons.Territory },
+    { name: 'Reports', href: '/official/reports', icon: Icons.Reports },
+    { name: 'Invite UC Chairman', href: '/official/invite/uc-chairman', icon: Icons.UserPlus },
+    { name: 'Profile', href: '/official/profile', icon: Icons.Profile },
   ];
 
   const adminNav = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: Icons.Dashboard },
     { name: 'Users', href: '/admin/users', icon: Icons.Users },
-    { name: 'Officials', href: '/admin/officials', icon: Icons.Users },
     { name: 'Territories', href: '/admin/territories', icon: Icons.Territory },
     { name: 'Categories', href: '/admin/categories', icon: Icons.Categories },
     { name: 'Analytics', href: '/admin/analytics', icon: Icons.Analytics },
+    { divider: true, name: 'Account Management' },
+    { name: 'Invite Mayor', href: '/admin/invite/mayor', icon: Icons.Building },
+    { name: 'Invite Town Chairman', href: '/admin/invite/town-chairman', icon: Icons.UserPlus },
+    { name: 'Invite UC Chairman', href: '/admin/invite/uc-chairman', icon: Icons.UserPlus },
   ];
 
   switch (role) {
     case 'admin':
+    case 'website_admin':
       return adminNav;
     case 'mayor':
       return mayorNav;
+    case 'town_chairman':
     case 'township_officer':
+      return townChairmanNav;
     case 'uc_chairman':
       return officialNav;
     case 'citizen':
@@ -132,11 +163,13 @@ const getNavigationItems = (role) => {
 const getRoleLabel = (role) => {
   switch (role) {
     case 'admin':
+    case 'website_admin':
       return 'Administrator';
     case 'mayor':
-      return 'Mayor';
+      return 'Mayor Portal';
+    case 'town_chairman':
     case 'township_officer':
-      return 'Township Officer';
+      return 'Town Chairman';
     case 'uc_chairman':
       return 'UC Chairman';
     default:
@@ -185,7 +218,17 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
+          // Handle dividers
+          if (item.divider) {
+            if (sidebarCollapsed) return null;
+            return (
+              <div key={`divider-${index}`} className="pt-4 pb-2 px-4">
+                <p className="text-xs font-semibold text-foreground/40 uppercase tracking-wider">{item.name}</p>
+              </div>
+            );
+          }
+
           const isActive = location.pathname === item.href || 
             (item.href !== '/' && location.pathname.startsWith(item.href));
           

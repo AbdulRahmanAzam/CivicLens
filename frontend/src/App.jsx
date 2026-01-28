@@ -55,7 +55,8 @@ import {
 import {
   ManageUsersPage,
   ManageTerritoriesPage,
-  ManageCategoriesPage
+  ManageCategoriesPage,
+  InvitationPage
 } from './pages/admin'
 
 // Error Pages
@@ -161,6 +162,7 @@ function App() {
             <Route path="complaints/:id" element={<ComplaintDetailPage />} />
             <Route path="territory" element={<TerritoryPage />} />
             <Route path="profile" element={<CitizenProfilePage />} />
+            <Route path="invite/:type" element={<InvitationPage />} />
           </Route>
 
           {/* Mayor Routes - Protected with Layout */}
@@ -173,6 +175,7 @@ function App() {
             <Route path="dashboard" element={<MayorDashboard />} />
             <Route path="complaints" element={<ManageComplaintsPage />} />
             <Route path="map" element={<TerritoryPage />} />
+            <Route path="invite/:type" element={<InvitationPage />} />
           </Route>
 
           {/* Legacy Township Dashboard Route - Redirect to Official */}
@@ -207,6 +210,7 @@ function App() {
             <Route path="users" element={<ManageUsersPage />} />
             <Route path="territories" element={<ManageTerritoriesPage />} />
             <Route path="categories" element={<ManageCategoriesPage />} />
+            <Route path="invite/:type" element={<InvitationPage />} />
           </Route>
 
           {/* Error Routes */}
