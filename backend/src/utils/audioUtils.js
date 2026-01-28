@@ -6,7 +6,6 @@
 
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
-const ffprobeStatic = require('ffprobe-static');
 const fs = require('fs').promises;
 const path = require('path');
 const { createWriteStream, createReadStream } = require('fs');
@@ -14,9 +13,23 @@ const os = require('os');
 const crypto = require('crypto');
 const axios = require('axios');
 
-// Set ffmpeg and ffprobe paths
+// Try to load ffprobe-static (optional)
+let ffprobeStatic = null;
+try {
+  ffprobeStatic = require('ffprobe-static');
+} catch (e) {
+  console.warn('⚠️ ffprobe-static not found. Audio duration detection may not work. Run: npm install ffprobe-static');
+}
+
+// Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
-ffmpeg.setFfprobePath(ffprobeStatic.path);
+
+// Set ffprobe path if available
+if (ffprobeStatic?.path) {
+  ffmpeg.setFfprobePath(ffprobeStatic.path);
+} else if (process.env.FFPROBE_PATH) {
+  ffmpeg.setFfprobePath(process.env.FFPROBE_PATH);
+}
 
 // Configuration
 const AUDIO_CONFIG = {
