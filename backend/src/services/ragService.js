@@ -14,21 +14,46 @@ class RAGService {
   constructor() {
     this.knowledgeBase = knowledgeBase;
     this.model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    this.isEnabled = process.env.RAG_ENABLED !== 'false';
+    console.log('✅ RAG Service initialized, enabled:', this.isEnabled);
   }
 
   /**
    * Check if a query is informational (asking about system/Karachi)
+   * Uses pattern matching first, then AI for ambiguous cases
    */
   async isInformationalQuery(text) {
-    const prompt = `Analyze if this query is asking for information/questions about:
-- CivicLens system, features, how to use
-- Karachi city, mayor, towns, administration
-- Complaint categories, status, tracking
-- General help or FAQ questions
-
-Query: "${text}"
-
-Respond with only "true" or "false".`;
+    if (!this.isEnabled || !text) return false;
+    
+    const textLower = text.toLowerCase().trim();
+    
+    // Quick pattern-based detection for obvious queries
+    const infoPatterns = [
+      /^(who|what|how|when|where|why|which|tell me|explain|describe)/i,
+      /\?$/,  // Ends with question mark
+      /mayor|chairman|karachi|town|uc|civiclens|complaint.*category|track.*status/i,
+      /helpline|contact|phone.*number|website/i,
+      /what.*can|how.*use|how.*submit|how.*track/i,
+    ];
+    
+    // If matches info pattern, likely informational
+    if (infoPatterns.some(p => p.test(textLower))) {
+      return true;
+    }
+    
+    // Skip AI check for complaint-like text
+    const complaintPatterns = [
+      /broken|damage|problem|issue|fix|repair|not working/i,
+      /garbage|pothole|water.*leak|no.*water|electricity.*cut/i,
+      /road|street|light|sewer|drain/i,
+    ];
+    
+    if (complaintPatterns.some(p => p.test(textLower))) {
+      return false;
+    }
+    
+    // Use AI for ambiguous cases
+    const prompt = `Is this a question asking for information (about CivicLens, Karachi, or civic services) OR is it a complaint about an issue?\n\nText: "${text}"\n\nRespond with only "info" or "complaint".`;
 
     try {
       const response = await groq.chat.completions.create({
@@ -39,10 +64,10 @@ Respond with only "true" or "false".`;
       });
 
       const result = response.choices[0]?.message?.content?.toLowerCase().trim();
-      return result === 'true';
+      return result === 'info';
     } catch (error) {
-      console.error('Error checking informational query:', error);
-      return false;
+      console.error('Error checking informational query:', error.message);
+      return false; // Default to complaint flow on error
     }
   }
 
