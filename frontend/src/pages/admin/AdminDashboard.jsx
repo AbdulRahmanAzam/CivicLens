@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts';
 
 const initialMayorForm = {
   fullName: '',
@@ -9,6 +11,8 @@ const initialMayorForm = {
 };
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('generate-mayor');
   const [formData, setFormData] = useState(initialMayorForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,6 +51,11 @@ const AdminDashboard = () => {
       });
       setFormData(initialMayorForm);
     }, 1200);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/sudo/admin');
   };
 
   return (

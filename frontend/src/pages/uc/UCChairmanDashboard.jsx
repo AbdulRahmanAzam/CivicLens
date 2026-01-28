@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts';
 
 const issueSeed = [
   {
@@ -27,6 +29,8 @@ const issueSeed = [
 const statusOptions = ['In review', 'In progress', 'Resolved'];
 
 const UCChairmanDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
   const [issues, setIssues] = useState(issueSeed);
   const [statusUpdates, setStatusUpdates] = useState({});
@@ -64,6 +68,11 @@ const UCChairmanDashboard = () => {
 
     setStatusMessage(`Status updated for ${issueId}.`);
     setTimeout(() => setStatusMessage(''), 2500);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/official/login');
   };
 
   return (

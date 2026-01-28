@@ -169,6 +169,11 @@ const TownshipDashboard = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/official/login');
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
