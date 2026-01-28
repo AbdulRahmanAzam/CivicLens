@@ -164,12 +164,15 @@ const CitizenDashboard = () => {
       const complaintsData = complaintsResponse.data?.complaints || complaintsResponse.data || [];
       
       // Transform complaints to match expected format
-      const transformedIssues = complaintsData.map(complaint => ({
-        id: complaint._id || complaint.id,
-        complaintId: complaint.complaintId || complaint._id,
-        title: complaint.description?.substring(0, 50) + (complaint.description?.length > 50 ? '...' : '') || 'Untitled',
+      const transformedIssues = complaintsData.map((complaint) => ({
+        id: complaint.id || complaint._id,
+        complaintId: complaint.complaintId || complaint.id || complaint._id,
+        title:
+          complaint.description?.substring(0, 50) +
+            (complaint.description?.length > 50 ? '...' : '') ||
+          'Untitled',
         description: complaint.description,
-        status: complaint.status?.current || complaint.status || 'submitted',
+        status: complaint.status || 'submitted',
         category: complaint.category,
         createdAt: complaint.createdAt,
       }));

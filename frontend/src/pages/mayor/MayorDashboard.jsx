@@ -69,7 +69,7 @@ const Icons = {
 };
 
 const MayorDashboard = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
   const [issues, setIssues] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -95,8 +95,14 @@ const MayorDashboard = () => {
         setLoading(true);
         
         // Fetch complaints for the city
-        const complaintsRes = await complaintsApi.getAll({ cityId: user.city });
-        setIssues(complaintsRes.data || []);
+        const complaintsRes = await complaintsApi.getComplaints({
+          cityId: user.city,
+          limit: 50,
+          sort_by: 'createdAt',
+          sort_order: 'desc',
+        });
+        const complaintsList = complaintsRes.data?.complaints || complaintsRes.data || [];
+        setIssues(complaintsList);
 
         // Fetch city analytics
         const analyticsRes = await analyticsApi.getCityAnalytics(user.city, 30);
@@ -333,17 +339,17 @@ const MayorDashboard = () => {
                   <p className="text-center text-foreground/60 py-8">No complaints found</p>
                 ) : (
                   issues.slice(0, 10).map((issue) => (
-                    <div key={issue._id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group">
+                    <div key={issue.id || issue._id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group">
                       <div className="flex flex-col md:flex-row md:items-center gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="text-xs font-mono text-foreground/50">{issue._id?.substring(0, 8) || 'N/A'}</span>
+                            <span className="text-xs font-mono text-foreground/50">{issue.complaintId || issue.id?.toString()?.substring(0, 8) || issue._id?.substring(0, 8) || 'N/A'}</span>
                             <span className="text-xs text-foreground/40">•</span>
                             <span className="text-xs text-foreground/50">{issue.category?.primary || 'Uncategorized'}</span>
-                            {issue.townName && (
+                            {issue.hierarchy?.townName && (
                               <>
                                 <span className="text-xs text-foreground/40">•</span>
-                                <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">{issue.townName}</span>
+                                <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">{issue.hierarchy.townName}</span>
                               </>
                             )}
                           </div>
@@ -354,8 +360,8 @@ const MayorDashboard = () => {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status?.current || 'submitted')}`}>
-                            {issue.status?.current || 'Submitted'}
+                          <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status || 'submitted')}`}>
+                            {issue.status || 'Submitted'}
                           </span>
                           <button className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-primary transition-colors"><Icons.ArrowRight /></button>
                         </div>

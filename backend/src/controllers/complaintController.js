@@ -587,8 +587,16 @@ const getMyComplaints = asyncHandler(async (req, res) => {
     throw new AppError('Authentication required', HTTP_STATUS.UNAUTHORIZED);
   }
 
+  const citizenMatch = [{ citizenUser: req.user._id }];
+  if (req.user.phone) {
+    citizenMatch.push({ 'citizenInfo.phone': req.user.phone });
+  }
+  if (req.user.email) {
+    citizenMatch.push({ 'citizenInfo.email': req.user.email });
+  }
+
   const filters = {
-    citizenUser: req.user._id,
+    citizenMatch,
     page: parseInt(req.query.page, 10) || 1,
     limit: parseInt(req.query.limit, 10) || 20,
     status: req.query.status,
@@ -614,26 +622,26 @@ const formatComplaintResponse = (complaint) => {
     complaintId: complaint.complaintId,
     description: complaint.description,
     category: {
-      primary: complaint.category.primary,
-      subcategory: complaint.category.subcategory,
-      urgency: complaint.category.urgency,
-      keywords: complaint.category.keywords,
-      source: complaint.category.classificationSource,
-      needsReview: complaint.category.needsReview,
+      primary: complaint.category?.primary || 'Others',
+      subcategory: complaint.category?.subcategory || null,
+      urgency: complaint.category?.urgency || null,
+      keywords: complaint.category?.keywords || [],
+      source: complaint.category?.classificationSource || null,
+      needsReview: complaint.category?.needsReview || false,
     },
-    status: complaint.status.current,
-    statusHistory: complaint.status.history,
+    status: complaint.status?.current || complaint.status || 'submitted',
+    statusHistory: complaint.status?.history || [],
     severity: {
-      score: complaint.severity.score,
-      priority: complaint.severity.priority,
-      factors: complaint.severity.factors,
+      score: complaint.severity?.score ?? null,
+      priority: complaint.severity?.priority || 'medium',
+      factors: complaint.severity?.factors || {},
     },
     location: {
-      coordinates: complaint.location.coordinates,
-      address: complaint.location.address,
-      area: complaint.location.area,
-      ward: complaint.location.ward,
-      pincode: complaint.location.pincode,
+      coordinates: complaint.location?.coordinates || [],
+      address: complaint.location?.address || '',
+      area: complaint.location?.area || '',
+      ward: complaint.location?.ward || '',
+      pincode: complaint.location?.pincode || '',
     },
     // Hierarchy information
     hierarchy: {

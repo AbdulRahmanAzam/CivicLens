@@ -52,6 +52,13 @@ const FALLBACK_CATEGORIES = [
   { id: 'other', name: 'Other' },
 ];
 
+const severityOptions = [
+  { value: 'low', label: 'Low - Minor inconvenience' },
+  { value: 'medium', label: 'Medium - Needs attention' },
+  { value: 'high', label: 'High - Urgent issue' },
+  { value: 'critical', label: 'Critical - Emergency' },
+];
+
 // Location icon
 const LocationIcon = () => (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

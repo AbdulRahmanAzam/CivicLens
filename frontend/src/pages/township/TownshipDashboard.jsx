@@ -59,7 +59,7 @@ const Icons = {
 };
 
 const TownshipDashboard = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [activeOperation, setActiveOperation] = useState('browse');
   const [issues, setIssues] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -82,8 +82,14 @@ const TownshipDashboard = () => {
         setLoading(true);
         
         // Fetch complaints for the town
-        const complaintsRes = await complaintsApi.getAll({ townId: user.town });
-        setIssues(complaintsRes.data || []);
+        const complaintsRes = await complaintsApi.getComplaints({
+          townId: user.town,
+          limit: 50,
+          sort_by: 'createdAt',
+          sort_order: 'desc',
+        });
+        const complaintsList = complaintsRes.data?.complaints || complaintsRes.data || [];
+        setIssues(complaintsList);
 
         // Fetch town analytics
         const analyticsRes = await analyticsApi.getTownAnalytics(user.town, 30);
@@ -279,22 +285,26 @@ const TownshipDashboard = () => {
           </div>
           <div className="p-4 space-y-3">
             {issues.map((issue) => (
-              <div key={issue.id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group">
+              <div key={issue.id || issue._id} className="rounded-xl border border-foreground/10 bg-gradient-to-r from-background to-white p-4 hover:shadow-md transition-all duration-200 group">
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`w-2 h-2 rounded-full ${getPriorityDot(issue.priority)}`}></span>
-                      <span className="text-xs font-mono text-foreground/50">{issue.id}</span>
+                      <span className={`w-2 h-2 rounded-full ${getPriorityDot(issue.severity?.priority)}`}></span>
+                      <span className="text-xs font-mono text-foreground/50">{issue.complaintId || issue.id?.toString()?.substring(0, 8) || issue._id?.substring(0, 8) || 'N/A'}</span>
                       <span className="text-xs text-foreground/40">•</span>
-                      <span className="text-xs text-foreground/50">{issue.category}</span>
-                      <span className="text-xs text-foreground/40">•</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-foreground/5 text-foreground/60">{issue.uc}</span>
+                      <span className="text-xs text-foreground/50">{issue.category?.primary || 'Uncategorized'}</span>
+                      {issue.hierarchy?.ucName && (
+                        <>
+                          <span className="text-xs text-foreground/40">•</span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-foreground/5 text-foreground/60">{issue.hierarchy.ucName}</span>
+                        </>
+                      )}
                     </div>
-                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{issue.title}</p>
-                    <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1"><Icons.Clock />Reported {issue.reportedOn}</p>
+                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{issue.description?.substring(0, 100) || 'No description'}</p>
+                    <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1"><Icons.Clock />Reported {issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : 'N/A'}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status)}`}>{issue.status}</span>
+                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${getStatusStyles(issue.status || 'submitted')}`}>{issue.status || 'Submitted'}</span>
                     <button className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/40 hover:text-primary transition-colors"><Icons.ArrowRight /></button>
                   </div>
                 </div>
