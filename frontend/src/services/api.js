@@ -44,7 +44,8 @@ api.interceptors.response.use(
             { refreshToken }
           );
           
-          const { accessToken, refreshToken: newRefreshToken } = response.data;
+          // Backend returns: { success, data: { accessToken, refreshToken } }
+          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
           localStorage.setItem('accessToken', accessToken);
           if (newRefreshToken) {
             localStorage.setItem('refreshToken', newRefreshToken);
@@ -76,7 +77,15 @@ export const authApi = {
    */
   register: async (userData) => {
     const response = await api.post('/auth/register', userData);
-    return response.data;
+    // Backend returns: { success, data: { user, tokens: { accessToken, refreshToken } } }
+    const { user, tokens } = response.data.data;
+    
+    // Store tokens
+    localStorage.setItem('accessToken', tokens.accessToken);
+    localStorage.setItem('refreshToken', tokens.refreshToken);
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    return { user, ...tokens };
   },
 
   /**
@@ -84,14 +93,15 @@ export const authApi = {
    */
   login: async (credentials) => {
     const response = await api.post('/auth/login', credentials);
-    const { accessToken, refreshToken, user } = response.data;
+    // Backend returns: { success, data: { user, tokens: { accessToken, refreshToken } } }
+    const { user, tokens } = response.data.data;
     
     // Store tokens
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('accessToken', tokens.accessToken);
+    localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(user));
     
-    return response.data;
+    return { user, ...tokens };
   },
 
   /**
@@ -125,7 +135,8 @@ export const authApi = {
    */
   getMe: async () => {
     const response = await api.get('/auth/me');
-    return response.data;
+    // Backend returns: { success, data: { user } }
+    return response.data.data;
   },
 
   /**
@@ -133,7 +144,8 @@ export const authApi = {
    */
   updateProfile: async (data) => {
     const response = await api.patch('/auth/me', data);
-    return response.data;
+    // Backend returns: { success, data: { user } }
+    return response.data.data;
   },
 
   /**
