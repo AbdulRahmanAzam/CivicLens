@@ -264,21 +264,29 @@ exports.createTown = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * @desc    Get towns in a city
+ * @desc    Get towns in a city OR all towns
  * @route   GET /api/hierarchy/cities/:cityId/towns
+ * @route   GET /api/hierarchy/towns
  * @access  Authenticated users
  */
 exports.getTowns = asyncHandler(async (req, res, next) => {
   const { cityId } = req.params;
   const { includeStats, includeInactive } = req.query;
 
-  const query = { city: cityId };
+  const query = {};
+  
+  // If cityId is provided, filter by city
+  if (cityId) {
+    query.city = cityId;
+  }
+  
   if (includeInactive !== 'true') {
     query.isActive = true;
   }
 
   let towns = await Town.find(query)
     .populate('townChairman', 'name email')
+    .populate('city', 'name code')
     .select('-boundary')
     .sort({ name: 1 });
 
@@ -502,21 +510,30 @@ exports.createUC = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * @desc    Get UCs in a town
+ * @desc    Get UCs in a town OR all UCs
  * @route   GET /api/hierarchy/towns/:townId/ucs
+ * @route   GET /api/hierarchy/ucs
  * @access  Authenticated users
  */
 exports.getUCs = asyncHandler(async (req, res, next) => {
   const { townId } = req.params;
   const { includeStats, includeInactive } = req.query;
 
-  const query = { town: townId };
+  const query = {};
+  
+  // If townId is provided, filter by town
+  if (townId) {
+    query.town = townId;
+  }
+  
   if (includeInactive !== 'true') {
     query.isActive = true;
   }
 
   let ucs = await UC.find(query)
     .populate('chairman', 'name email')
+    .populate('town', 'name code')
+    .populate('city', 'name code')
     .select('-boundary')
     .sort({ ucNumber: 1 });
 
