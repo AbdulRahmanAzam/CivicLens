@@ -186,10 +186,10 @@ export const createClusterIcon = (cluster) => {
  * UC boundary style
  */
 export const getUCStyle = (feature, isHovered = false, isSelected = false) => ({
-  color: isSelected ? '#3B82F6' : '#6366F1',
+  color: isSelected ? '#166534' : '#22C55E',
   weight: isSelected ? 3 : isHovered ? 2 : 1,
   opacity: isSelected ? 1 : isHovered ? 0.9 : 0.6,
-  fillColor: isSelected ? '#3B82F6' : '#6366F1',
+  fillColor: isSelected ? '#166534' : '#22C55E',
   fillOpacity: isSelected ? 0.2 : isHovered ? 0.15 : 0.05,
   dashArray: isSelected ? null : '5, 5',
 });
@@ -198,7 +198,7 @@ export const getUCStyle = (feature, isHovered = false, isSelected = false) => ({
  * Town boundary style
  */
 export const getTownStyle = (feature, isHovered = false, isSelected = false) => ({
-  color: isSelected ? '#059669' : '#10B981',
+  color: isSelected ? '#052E16' : '#166534',
   weight: isSelected ? 4 : isHovered ? 3 : 2,
   opacity: isSelected ? 1 : isHovered ? 0.9 : 0.7,
   fillColor: 'transparent',
@@ -298,8 +298,8 @@ export const HEATMAP_CONFIG = {
   max: 1.0,
   minOpacity: 0.4,
   gradient: {
-    0.2: '#3B82F6',  // Blue - low
-    0.4: '#10B981',  // Green
+    0.2: '#22C55E',  // Green - low
+    0.4: '#86EFAC',  // Light green
     0.6: '#F59E0B',  // Yellow
     0.8: '#F97316',  // Orange
     1.0: '#EF4444',  // Red - high
