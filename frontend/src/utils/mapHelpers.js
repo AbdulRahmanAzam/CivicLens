@@ -114,8 +114,28 @@ export const leafletToGeoJSON = (coordinates) => {
  * Convert complaint location to Leaflet coordinates
  */
 export const getComplaintLatLng = (complaint) => {
-  if (!complaint?.location?.coordinates) return null;
-  return geoJSONToLeaflet(complaint.location.coordinates);
+  if (!complaint) return null;
+
+  if (complaint.location?.coordinates?.length >= 2) {
+    return geoJSONToLeaflet(complaint.location.coordinates);
+  }
+
+  const lat = complaint.location?.lat ?? complaint.latitude ?? complaint.lat;
+  const lng = complaint.location?.lng ?? complaint.longitude ?? complaint.lng;
+
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return [lat, lng];
+  }
+
+  if (typeof lat === 'string' && typeof lng === 'string') {
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
+      return [parsedLat, parsedLng];
+    }
+  }
+
+  return null;
 };
 
 /**
@@ -125,13 +145,18 @@ export const getComplaintLatLng = (complaint) => {
  */
 export const complaintsToHeatmapData = (complaints) => {
   return complaints
-    .filter(c => c.location?.coordinates)
-    .map(c => {
-      const [lng, lat] = c.location.coordinates;
-      // Intensity based on severity (1-10) normalized to 0-1
-      const intensity = (c.severity || 5) / 10;
+    .map((c) => {
+      const latLng = getComplaintLatLng(c);
+      if (!latLng) return null;
+
+      const [lat, lng] = latLng;
+      const severityScore = typeof c.severity === 'number'
+        ? c.severity
+        : c.severity?.score ?? 5;
+      const intensity = Math.min(Math.max(severityScore / 10, 0.1), 1);
       return [lat, lng, intensity];
-    });
+    })
+    .filter(Boolean);
 };
 
 /**

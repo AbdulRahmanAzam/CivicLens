@@ -97,12 +97,8 @@ const calculateFrequencyScore = async (longitude, latitude, category, excludeId 
   
   const query = {
     location: {
-      $nearSphere: {
-        $geometry: {
-          type: 'Point',
-          coordinates: [longitude, latitude],
-        },
-        $maxDistance: radiusMeters,
+      $geoWithin: {
+        $centerSphere: [[longitude, latitude], radiusMeters / 6371000],
       },
     },
     createdAt: {

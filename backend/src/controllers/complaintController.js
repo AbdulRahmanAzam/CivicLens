@@ -587,8 +587,16 @@ const getMyComplaints = asyncHandler(async (req, res) => {
     throw new AppError('Authentication required', HTTP_STATUS.UNAUTHORIZED);
   }
 
+  const citizenMatch = [{ citizenUser: req.user._id }];
+  if (req.user.phone) {
+    citizenMatch.push({ 'citizenInfo.phone': req.user.phone });
+  }
+  if (req.user.email) {
+    citizenMatch.push({ 'citizenInfo.email': req.user.email });
+  }
+
   const filters = {
-    citizenUser: req.user._id,
+    citizenMatch,
     page: parseInt(req.query.page, 10) || 1,
     limit: parseInt(req.query.limit, 10) || 20,
     status: req.query.status,
@@ -615,15 +623,15 @@ const formatComplaintResponse = (complaint) => {
     id: complaint._id,
     complaintId: complaint.complaintId,
     description: complaint.description,
-    category: complaint.category ? {
-      primary: complaint.category.primary || 'General',
-      subcategory: complaint.category.subcategory,
-      urgency: complaint.category.urgency || 'medium',
-      keywords: complaint.category.keywords || [],
-      source: complaint.category.classificationSource,
-      needsReview: complaint.category.needsReview || false,
-    } : { primary: 'General', urgency: 'medium', keywords: [], needsReview: false },
-    status: complaint.status?.current || 'submitted',
+    category: {
+      primary: complaint.category?.primary || 'Others',
+      subcategory: complaint.category?.subcategory || null,
+      urgency: complaint.category?.urgency || null,
+      keywords: complaint.category?.keywords || [],
+      source: complaint.category?.classificationSource || null,
+      needsReview: complaint.category?.needsReview || false,
+    },
+    status: complaint.status?.current || complaint.status || 'submitted',
     statusHistory: complaint.status?.history || [],
     severity: complaint.severity ? {
       score: complaint.severity.score || 50,

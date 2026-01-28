@@ -1,5 +1,6 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { AppError } = require('./errorHandler');
 
 /**
@@ -24,9 +25,21 @@ const MAX_FILES = 5;
 
 /**
  * Multer storage configuration
- * Using memory storage for cloud upload (Cloudinary)
+ * Store images locally under /uploads/complaints
  */
-const storage = multer.memoryStorage();
+const uploadsRoot = path.join(__dirname, '../../uploads/complaints');
+fs.mkdirSync(uploadsRoot, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsRoot);
+  },
+  filename: (req, file, cb) => {
+    const safeExt = path.extname(file.originalname).toLowerCase();
+    const uniqueName = `complaint-${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`;
+    cb(null, uniqueName);
+  },
+});
 
 /**
  * File filter to validate uploaded files
@@ -91,14 +104,22 @@ const handleUploadError = (err, req, res, next) => {
       default:
         message = err.message;
     }
-    return next(new AppError(message, 400));
+    if (typeof next === 'function') {
+      return next(new AppError(message, 400));
+    }
+    return res.status(400).json({ success: false, message });
   }
   
   if (err) {
-    return next(err);
+    if (typeof next === 'function') {
+      return next(err);
+    }
+    return res.status(500).json({ success: false, message: err.message || 'Upload failed' });
   }
   
-  next();
+  if (typeof next === 'function') {
+    next();
+  }
 };
 
 /**

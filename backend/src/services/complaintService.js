@@ -1,4 +1,5 @@
 const { Complaint, Category } = require('../models');
+const path = require('path');
 const geoService = require('./geoService');
 const cloudinaryService = require('./cloudinaryService');
 const classificationService = require('./classificationService');
@@ -14,6 +15,13 @@ const {
 } = require('../utils/helpers');
 const { PAGINATION, GEO, TIME } = require('../utils/constants');
 const { AppError } = require('../middlewares/errorHandler');
+const env = require('../config/env');
+
+const uploadsRoot = path.join(__dirname, '../../uploads');
+const buildLocalImageUrl = (filePath) => {
+  const relativePath = path.relative(uploadsRoot, filePath).replace(/\\/g, '/');
+  return `/uploads/${relativePath}`;
+};
 
 /**
  * Complaint Service
@@ -55,19 +63,28 @@ class ComplaintService {
       location = { address };
     }
 
-    // Upload images to cloud storage
+    // Upload images to local storage (fallback to Cloudinary if buffer is available)
     const images = [];
     if (files && files.length > 0) {
       for (const file of files) {
         try {
-          const uploadResult = await cloudinaryService.uploadImage(file.buffer, {
-            folder: 'civiclens/complaints',
-          });
-          images.push({
-            url: uploadResult.secure_url,
-            publicId: uploadResult.public_id,
-            analysis: {},
-          });
+          if (file.path) {
+            const url = buildLocalImageUrl(file.path);
+            images.push({
+              url,
+              publicId: url,
+              analysis: {},
+            });
+          } else if (file.buffer) {
+            const uploadResult = await cloudinaryService.uploadImage(file.buffer, {
+              folder: 'civiclens/complaints',
+            });
+            images.push({
+              url: uploadResult.secure_url,
+              publicId: uploadResult.public_id,
+              analysis: {},
+            });
+          }
         } catch (error) {
           console.error('Image upload failed:', error.message);
           // Continue without the failed image
@@ -183,6 +200,7 @@ class ComplaintService {
       townId,
       cityId,
       citizenUser,
+      citizenMatch,
       slaBreach,
       ...otherFilters
     } = filters;
@@ -197,6 +215,9 @@ class ComplaintService {
     if (townId) query.townId = townId;
     if (cityId) query.cityId = cityId;
     if (citizenUser) query.citizenUser = citizenUser;
+    if (Array.isArray(citizenMatch) && citizenMatch.length > 0) {
+      query.$or = citizenMatch;
+    }
     if (slaBreach) query.slaBreach = true;
 
     // Handle geo-queries
@@ -239,7 +260,6 @@ class ComplaintService {
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .populate('assignedTo', 'name department')
       .populate('ucId', 'name code')
       .populate('townId', 'name code')
       .populate('cityId', 'name code')
@@ -260,7 +280,6 @@ class ComplaintService {
   async getComplaintById(id) {
     // Try to find by complaintId first, then by _id
     let complaint = await Complaint.findOne({ complaintId: id })
-      .populate('assignedTo', 'name department')
       .populate('duplicateOf', 'complaintId description')
       .populate('linkedComplaints', 'complaintId description status.current')
       .populate('ucId', 'name code')
@@ -271,7 +290,6 @@ class ComplaintService {
     if (!complaint) {
       // Try ObjectId
       complaint = await Complaint.findById(id)
-        .populate('assignedTo', 'name department')
         .populate('duplicateOf', 'complaintId description')
         .populate('linkedComplaints', 'complaintId description status.current')
         .populate('ucId', 'name code')

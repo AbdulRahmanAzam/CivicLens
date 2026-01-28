@@ -279,21 +279,39 @@ export const authApi = {
  */
 export const complaintsApi = {
   /**
+   * Get current user's complaints
+   */
+  getMyComplaints: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.status) queryParams.append('status', params.status);
+
+    const response = await api.get(`/complaints/my?${queryParams.toString()}`);
+    return response.data;
+  },
+  /**
    * Fetch complaints with optional filters
    * @param {Object} filters - Query parameters for filtering
    * @returns {Promise} - Array of complaints
    */
   getComplaints: async (filters = {}) => {
     const params = new URLSearchParams();
+
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
     
     if (filters.category) params.append('category', filters.category);
     if (filters.severity_min) params.append('severity_min', filters.severity_min);
     if (filters.severity_max) params.append('severity_max', filters.severity_max);
     if (filters.status) params.append('status', filters.status);
-    if (filters.uc_id) params.append('uc_id', filters.uc_id);
-    if (filters.town) params.append('town', filters.town);
+    if (filters.ucId) params.append('ucId', filters.ucId);
+    if (filters.townId) params.append('townId', filters.townId);
+    if (filters.cityId) params.append('cityId', filters.cityId);
     if (filters.date_from) params.append('date_from', filters.date_from);
     if (filters.date_to) params.append('date_to', filters.date_to);
+    if (filters.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters.sort_order) params.append('sort_order', filters.sort_order);
     if (filters.bounds) {
       params.append('sw_lat', filters.bounds.sw_lat);
       params.append('sw_lng', filters.bounds.sw_lng);
@@ -385,7 +403,10 @@ export const complaintsApi = {
    * @returns {Promise} - Created complaint
    */
   createComplaint: async (complaintData) => {
-    const response = await api.post('/complaints', complaintData);
+    const isFormData = typeof FormData !== 'undefined' && complaintData instanceof FormData;
+    const response = await api.post('/complaints', complaintData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return response.data;
   },
 
@@ -396,8 +417,8 @@ export const complaintsApi = {
    * @param {string} notes - Optional notes
    * @returns {Promise} - Updated complaint
    */
-  updateStatus: async (id, status, notes = '') => {
-    const response = await api.patch(`/complaints/${id}/status`, { status, notes });
+  updateStatus: async (id, status, remarks = '') => {
+    const response = await api.patch(`/complaints/${id}/status`, { status, remarks });
     return response.data;
   },
 

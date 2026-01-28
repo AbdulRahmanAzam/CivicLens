@@ -123,19 +123,15 @@ const useComplaints = (filters = {}, options = {}) => {
 
     try {
       const response = await complaintsApi.getComplaints(filterParams);
-      
-      // Safely extract complaints data - handle various API response formats
-      let complaintsData = [];
-      if (Array.isArray(response)) {
-        complaintsData = response;
-      } else if (response && Array.isArray(response.complaints)) {
-        complaintsData = response.complaints;
-      } else if (response && Array.isArray(response.data)) {
-        complaintsData = response.data;
-      } else if (response && typeof response === 'object') {
-        // If response is an object but data isn't an array, try to extract array values
-        complaintsData = [];
-      }
+      const complaintsData = Array.isArray(response?.data?.complaints)
+        ? response.data.complaints
+        : Array.isArray(response?.complaints)
+          ? response.complaints
+          : Array.isArray(response?.data)
+            ? response.data
+            : Array.isArray(response)
+              ? response
+              : [];
       
       setComplaints(complaintsData);
       
