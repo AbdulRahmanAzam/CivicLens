@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Logo from '../Logo';
 
 const Navbar = () => {
@@ -55,9 +56,20 @@ const Navbar = () => {
                 {link.name}
               </a>
             ))}
-            <button className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-full font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-primary/25">
-              Report Issue
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/login"
+                className="px-5 py-2.5 rounded-full border border-primary/30 text-primary font-semibold transition-all duration-200 hover:border-primary/60"
+              >
+                Citizen Login
+              </Link>
+              <Link
+                to="/citizen/dashboard"
+                className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-full font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-primary/25"
+              >
+                Report Issue
+              </Link>
+            </div>
           </div>
 
           {/* Mobile Menu Button */}
@@ -107,9 +119,20 @@ const Navbar = () => {
                 {link.name}
               </a>
             ))}
-            <button className="bg-primary text-white px-6 py-2.5 rounded-full font-semibold w-fit">
+            <Link
+              to="/login"
+              className="px-6 py-2.5 rounded-full border border-primary/30 text-primary font-semibold w-fit"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Citizen Login
+            </Link>
+            <Link
+              to="/citizen/dashboard"
+              className="bg-primary text-white px-6 py-2.5 rounded-full font-semibold w-fit"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
               Report Issue
-            </button>
+            </Link>
           </div>
         </div>
       </div>
