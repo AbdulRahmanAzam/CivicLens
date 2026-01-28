@@ -67,7 +67,7 @@
 
 .map-controls {
   position: absolute;
-  top: 20px;
+  top: 92px;
   right: 20px;
   z-index: 1000;
   display: flex;
@@ -568,7 +568,7 @@
 
 .map-error-message {
   position: absolute;
-  top: 20px;
+  top: 92px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
@@ -616,7 +616,7 @@
   }
 
   .map-controls {
-    top: 12px;
+    top: 76px;
     right: 12px;
   }
 
@@ -633,6 +633,12 @@
     font-size: 12px;
   }
 
+  .map-error-message {
+    top: 76px;
+    width: calc(100% - 24px);
+    max-width: 520px;
+  }
+
   .complaint-popup {
     min-width: 260px;
   }
@@ -644,7 +650,7 @@
   }
 
   .map-controls {
-    top: 8px;
+    top: 68px;
     right: 8px;
   }
 

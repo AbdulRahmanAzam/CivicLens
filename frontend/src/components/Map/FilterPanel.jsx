@@ -103,7 +103,7 @@ const FilterPanel = ({
       {/* Toggle Button - Always visible */}
       <button
         onClick={onToggleCollapse}
-        className={`fixed top-20 z-[1001] flex items-center gap-2 px-4 py-3 rounded-r-xl shadow-lg border border-l-0 transition-all duration-300 ${
+        className={`fixed top-24 z-[1001] flex items-center gap-2 px-4 py-3 rounded-r-xl shadow-lg border border-l-0 transition-all duration-300 ${
           isCollapsed 
             ? 'left-0 bg-white border-gray-200 text-gray-700 hover:bg-gray-50' 
             : 'left-[320px] bg-primary text-white border-primary'
