@@ -320,45 +320,36 @@ const hierarchyAccess = (req, res, next) => {
     return next();
   }
 
-  // Mayors see their city
+  // Mayors see their city (or all if not assigned yet)
   if (req.user.role === 'mayor') {
-    if (!req.user.cityId) {
-      return next(
-        new AppError(
-          'No city assigned. Please contact administrator.',
-          HTTP_STATUS.FORBIDDEN
-        )
-      );
+    if (req.user.cityId) {
+      req.hierarchyFilter = { cityId: req.user.cityId };
+    } else {
+      // No city assigned yet - allow access to all complaints
+      req.hierarchyFilter = {};
     }
-    req.hierarchyFilter = { cityId: req.user.cityId };
     return next();
   }
 
-  // Town chairmen see their town
+  // Town chairmen see their town (or all if not assigned yet)
   if (req.user.role === 'town_chairman') {
-    if (!req.user.townId) {
-      return next(
-        new AppError(
-          'No town assigned. Please contact administrator.',
-          HTTP_STATUS.FORBIDDEN
-        )
-      );
+    if (req.user.townId) {
+      req.hierarchyFilter = { townId: req.user.townId };
+    } else {
+      // No town assigned yet - allow access to all complaints
+      req.hierarchyFilter = {};
     }
-    req.hierarchyFilter = { townId: req.user.townId };
     return next();
   }
 
-  // UC chairmen see their UC
+  // UC chairmen see their UC (or all if not assigned yet)
   if (req.user.role === 'uc_chairman') {
-    if (!req.user.ucId) {
-      return next(
-        new AppError(
-          'No UC assigned. Please contact administrator.',
-          HTTP_STATUS.FORBIDDEN
-        )
-      );
+    if (req.user.ucId) {
+      req.hierarchyFilter = { ucId: req.user.ucId };
+    } else {
+      // No UC assigned yet - allow access to all complaints
+      req.hierarchyFilter = {};
     }
-    req.hierarchyFilter = { ucId: req.user.ucId };
     return next();
   }
 
